@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>{% block title %}{% endblock title %}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="/bootstrap/css/bootstrap.min.css"  rel="stylesheet">
+    <link href="/bootstrap/css/bootstrap-responsive.css" rel="stylesheet">
+    <link href="/css/style.css" rel="stylesheet">
+    
+    
+</head>
+<body class="mainbody">
+<script src="http://code.jquery.com/jquery.js"></script>
+<div>
+    <div class="navbar navbar-inverse">
+        <div class="navbar-inner">
+            <div class="container">
+                <a class="brand" href="http://localhost/">AskKameskiy</a>
+                <div class="nav-collapse collapse">
+                    <form class="navbar-form pull-left form-search">
+                        <input type="text" class="search-query" placeholder="Search">
+                        <button type="submit" class="btn" formaction="http://localhost/ask/">ASK</button>
+                    </form>
+                <div class="navbar-form pull-right">
+                {% if user.is_authenticated %}
+                      <div class="span1">
+                        <img src="http://localhost/{{authuser.image}}">
+                      </div>
+                      <div class="span2">
+                    
+                        {{ user.username }}
+                        <a href="http://localhost/logout/">log out</a>
+                        <a href="http://localhost/profile/edit">settings</a>
+                    {% else %}
+                    <div>
+                        <a href="http://localhost/login/">log in</a>
+                    </div> 
+                    {% endif %}
+                  </div>
+                </div>
+            </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class ="container">
+        
+        <div class ="row" style="min-width: 1000px;">
+            <div class="span8 questiontext" style="min-width: 700px; ">
+                {% block content %}{% endblock content %}
+            </div>
+
+            <div class="span2 offset1 well tagblock">
+                <h2>Popular Tags</h2>
+                
+                <h2>Best Members</h2>
+                {% for user in users %}
+                    <a href="#"><h4>{{user}}</h4></a>
+                {% endfor %} 
+            </div>
+           
+        </div>
+    </div>
+</div>
+</body>
+</html>

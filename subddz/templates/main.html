@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Главная страница{% endblock %}
+
+{% block content %}
+<div class = "row">
+	<div class = "span1">
+		<a href="http://localhost?sort=pop"><h3>rating</h3></a>
+	</div>
+	<div class = "span1">
+		<a href="http://localhost?sort=new"><h3>new</h3></a>
+	</div>
+</div>
+{% if sort_tag %}<h3>Find tag: {{ sort_tag }}</h3>{% endif %}
+{% for question in questions %}
+	<div class = "question well">
+		<div class = "row questionrow">
+			<div class = "span2">
+				<div class = "questionuserblock">
+					<h5>{{question.author.user}}</h5>
+					<img src="/{{question.author.image}}">
+					<div class="btn-group">
+						<button class="btn btn-block custom">+</button>
+						<button class="btn btn-block disabled custom">{{question.rating}}</button>
+						<button class="btn btn-block custom">-</button>
+					</div>
+				</div>
+
+			</div>
+			<div class = "span5 questionblock">
+				<a href="http://localhost/question/?id={{question.id}}"><h3>{{question.title}}</h3></a>
+				<h4>{{question.text}}</h4>
+				<div class = "tags">
+					<a href="http://localhost/question/?id={{question.id}}">answer</a>
+
+					Tags:
+					{% for tag in question.tags.all %}
+                    	<a href="http://localhost/?tag={{tag}}">{{tag}}</a>
+                	{% endfor %} 
+					
+					{{question.add_date}}
+				</div>
+			</div>
+
+		</div>
+	</div>
+{% endfor %}
+<div class = "row">
+    <div class = "span4 offset2">
+        <div class="pagination">
+            <ul>
+                <li><a href="http://localhost?page=1">First</a></li>
+                {% if prev_page %}
+                	<li><a href="http://localhost?page={{prev_page}}">{{prev_page}}</a></li>
+                {% endif %}
+                <li><a href="http://localhost?page={{num_pages}}">{{num_pages}}</a></li>
+                {% if next_page %}
+                	<li><a href="http://localhost?page={{next_page}}">{{next_page}}</a></li>
+                {% endif %}
+                <li><a href="http://localhost?page={{last_page}}">Last</a></li>
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

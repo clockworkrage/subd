@@ -1,12 +1,13 @@
 from django.db import models
 
-# Create your models here.
+
 class User(models.Model):
 	name = models.CharField(max_length = 50, default='name')
 	username = models.CharField(max_length = 50, default='username')
 	isAnonymous = models.BooleanField(default=False)
 	email = models.CharField(max_length = 50, default='email')
 	about = models.TextField(max_length = 700, default='about')
+	follow = models.ManyToManyField("self")
 
 	def __unicode__(self):
 		return self.email
@@ -21,13 +22,14 @@ class Forum(models.Model):
 
 class Thread(models.Model):
 	date = models.DateTimeField(auto_now_add=True)
-	user = models.ForeignKey(User)
+	user = models.ForeignKey(User, related_name='%(class)s_user_create')
 	forum = models.ForeignKey(Forum)
 	title = models.CharField(max_length = 50, default='title')
 	slug = models.CharField(max_length = 50, default='title')
 	message = models.CharField(max_length = 150, default='message')
 	isClosed = models.BooleanField(default=False)
 	isDeleted = models.BooleanField(default=False)
+	subscribe = models.ManyToManyField(User, related_name='%(class)s_user_subs')
 	
 
 	def __unicode__(self):

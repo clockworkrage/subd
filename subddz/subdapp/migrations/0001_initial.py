@@ -63,7 +63,8 @@ class Migration(migrations.Migration):
                 ('username', models.CharField(default=b'username', max_length=50)),
                 ('isAnonymous', models.BooleanField(default=False)),
                 ('email', models.CharField(default=b'email', max_length=50)),
-                ('about', models.CharField(default=b'about', max_length=100)),
+                ('about', models.TextField(default=b'about', max_length=700)),
+                ('follow', models.ManyToManyField(related_name='follow_rel_+', to='subdapp.User')),
             ],
             options={
             },
@@ -71,8 +72,14 @@ class Migration(migrations.Migration):
         ),
         migrations.AddField(
             model_name='thread',
+            name='subscribe',
+            field=models.ManyToManyField(related_name='thread_user_subs', to='subdapp.User'),
+            preserve_default=True,
+        ),
+        migrations.AddField(
+            model_name='thread',
             name='user',
-            field=models.ForeignKey(to='subdapp.User'),
+            field=models.ForeignKey(related_name='thread_user_create', to='subdapp.User'),
             preserve_default=True,
         ),
         migrations.AddField(

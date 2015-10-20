@@ -1,0 +1,12 @@
+CONFIG = {
+        'mode': 'wsgi',
+        'working_dir': '/home/uschsh/subd_dz/subddz',
+        'user': 'www-data',
+        'group': 'www-data',
+        'args': (
+                '--bind=127.0.0.1:8082',
+        		'--workers=16',
+        		'--timeout=60',
+                'wsgi:application',
+        ),
+}

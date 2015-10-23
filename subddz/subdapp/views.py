@@ -46,9 +46,9 @@ def user_create(request):
 		isAnon = input_params['isAnonymous']
 		email = input_params['email']
 		if isAnon:
-			about = "about"
-			name = "name"
-			username = "username"
+			about = "Null"
+			name = "Null"
+			username = "Null"
 		else:
 			about = input_params['about']
 			name = input_params['name']
@@ -65,7 +65,7 @@ def user_create(request):
 			user.save()
 			user_id = user.id
 
-			main_response = {'code':'0'}
+			main_response = {'code':0}
 			json_response['about'] = about
 			json_response['email'] = email
 			json_response['id'] = user_id
@@ -101,7 +101,7 @@ def clear(request):
 	
 	
 
-	main_responce = {'code':'0'}
+	main_responce = {'code':0}
 	main_responce['response'] = "OK"
 
 	response = JsonResponse(main_responce)
@@ -109,24 +109,34 @@ def clear(request):
 
 def get_user_info(user_detail):
 	info = {}
-	info['about'] = user_detail.about
-	info['email'] = user_detail.email
-	
-	info['followers'] = list(User.objects.values_list('email', flat=True).filter(follow=user_detail))
-	info['following'] = list(user_detail.follow.values_list('email', flat=True).filter())
+
+	if user_detail.isAnonymous == False:
+		info['about'] = user_detail.about
+		info['username'] = user_detail.username
+		info['name'] = user_detail.name
+		info['followers'] = list(User.objects.values_list('email', flat=True).filter(follow=user_detail))
+		info['following'] = list(user_detail.follow.values_list('email', flat=True).filter())
+	else:
+		info['about'] = None
+		info['username'] = None
+		info['name'] = None
+		info['followers'] = []
+		info['following'] = []
 
 	info['subscriptions'] = list(Thread.objects.values_list('id', flat=True).filter(subscribe=user_detail))
 
 	info['id'] = user_detail.id
 	info['isAnonymous'] = user_detail.isAnonymous
-	info['name'] = user_detail.name
-	info['username'] = user_detail.username
+	info['email'] = user_detail.email
+	
+	
 	return info
 
 #Requesting http://some.host.ru/db/api/user/details/?user=example%40mail.ru:	
 def user_details(request):
 
-	main_response = {'code':'0'}
+	main_response = {'code':0}
+
 	json_response = {}
 
 	user_email = request.GET['user']
@@ -161,7 +171,7 @@ def user_follow(request):
 
 		follower_user.follow.add(followee_user)
 
-		main_response = {'code':'0'}
+		main_response = {'code':0}
 
 		json_response = get_user_info(follower_user)
 
@@ -170,6 +180,22 @@ def user_follow(request):
 	main_response['response'] = json_response;
 	response = JsonResponse(main_response)
 
+	return response
+
+def user_updateProfile(request):
+
+	main_response = {'code':0}
+
+	json_response = {}
+
+	if request.method == 'POST':
+		input_params = json.loads(request.body)
+
+		about = input_params['about']
+		user_email = input_params['user']
+		user_name = input_params['name']
+
+	response = JsonResponse(main_response)
 	return response
 
 def dictfetchall(cursor):
@@ -198,7 +224,7 @@ def status(request):
 	json_response['forum'] = str(row[0]['thread_number'])
 	json_response['post'] = str(row[0]['post_number'])
 
-	main_response = {'code':'0'}
+	main_response = {'code':0}
 	
 	main_response['response'] = json_response;
 	response = JsonResponse(main_response)
@@ -207,7 +233,7 @@ def status(request):
 #Requesting http://some.host.ru/db/api/forum/create/ with {"name": "Forum With Sufficiently Large Name", "short_name": "forumwithsufficientlylargename", "user": "richard.nixon@example.com"}:
 def forum_create(request):
 
-	main_response = {'code':'0'}
+	main_response = {'code':0}
 	
 	if request.method == 'POST':
 		input_params = json.loads(request.body)

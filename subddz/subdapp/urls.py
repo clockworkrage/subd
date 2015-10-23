@@ -12,5 +12,7 @@ urlpatterns = patterns('',
 	url(r'^db/api/user/create/$', views.user_create, name='user_create'),
 	url(r'^db/api/user/details/$', views.user_details, name='user_details'),
 	url(r'^db/api/user/follow/$', views.user_follow, name='user_follow'),
+	url(r'^db/api/user/updateProfile/$', views.user_updateProfile, name='user_updateProfile'),
 	url(r'^db/api/forum/create/$', views.forum_create, name='forum_create'),
+
 )

@@ -14,5 +14,9 @@ urlpatterns = patterns('',
 	url(r'^db/api/user/follow/$', views.user_follow, name='user_follow'),
 	url(r'^db/api/user/updateProfile/$', views.user_updateProfile, name='user_updateProfile'),
 	url(r'^db/api/forum/create/$', views.forum_create, name='forum_create'),
+	url(r'^db/api/forum/details/$', views.forum_details, name='forum_details'),
+	url(r'^db/api/thread/create/$', views.thread_create, name='thread_create'),
+	url(r'^db/api/thread/details/$', views.thread_details, name='thread_details'),
+	url(r'^db/api/post/create/$', views.post_create, name='post_create'),
 
 )

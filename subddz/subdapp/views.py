@@ -45,6 +45,7 @@ def user_create(request):
 
 		isAnon = input_params['isAnonymous']
 		email = input_params['email']
+
 		if isAnon:
 			about = "Null"
 			name = "Null"
@@ -92,13 +93,21 @@ def clear(request):
 	connection.commit()
 	cursor.execute("DELETE FROM subdapp_user_follow")
 	connection.commit()
-	#cursor.execute("DELETE FROM subdapp_thread_subscribe")
+
+	cursor.execute("DELETE FROM subdapp_thread_subscribe")
+	connection.commit()
+	
 	cursor.execute("DELETE FROM subdapp_user;")
 	connection.commit()
-	#cursor.execute("DELETE FROM subdapp_forum") 
-	#cursor.execute("DELETE FROM subdapp_thread")
-	#cursor.execute("DELETE FROM subdapp_post")
-	
+
+	cursor.execute("DELETE FROM subdapp_forum") 
+	connection.commit()
+
+	cursor.execute("DELETE FROM subdapp_thread")
+	connection.commit()
+
+	cursor.execute("DELETE FROM subdapp_post")
+	connection.commit()
 	
 
 	main_responce = {'code':0}
@@ -166,8 +175,8 @@ def user_follow(request):
 		follower_user = User.objects.get(email = follower_email)
 		followee_user = User.objects.get(email = followee_email)
 
-		logger.error(follower_user)
-		logger.error(followee_user)
+		#logger.error(follower_user)
+		#logger.error(followee_user)
 
 		follower_user.follow.add(followee_user)
 
@@ -252,12 +261,142 @@ def forum_create(request):
 		forum = Forum(name=name, short_name=short_name, user=user)
 		forum.save()
 
-
 		json_response = {}
 		json_response['id'] = forum.id
 		json_response['name'] = forum.name
 		json_response['short_name'] = forum.short_name
 		json_response['user'] = user.email
+
+	#logger.error("Done")
+	main_response['response'] = json_response;
+	response = JsonResponse(main_response)
+
+	return response
+#http://some.host.ru/db/api/forum/details/?related=user&forum=forum3:
+def forum_details(request):
+	main_response = {}
+	json_response = {}
+	if request.method == 'GET':
+		short_name = request.GET['forum']
+		related = request.GET['related']
+
+		forum = Forum.objects.get(short_name = short_name)
+
+		main_response = {'code':0}
+		json_response['id'] = forum.id
+		json_response['name'] = forum.name
+		json_response['short_name'] = forum.short_name
+
+		if related.count('user') == 1:
+			json_response['user'] = get_user_info(forum.user)
+
+
+	main_response['response'] = json_response
+	response = JsonResponse(main_response)
+
+	return response
+
+def post_create(request):
+	#logger.error("POST:")
+	main_response = {'code':0}
+	json_response = {}
+	if request.method == 'POST':
+		input_params = json.loads(request.body)
+		#logger.error("user_email")
+		#logger.error(request.body)
+
+		isApproved = input_params['isApproved']
+		user_email = input_params['user']
+		date = input_params['date']
+		message = input_params['message']
+		isSpam = input_params['isSpam']
+		isHighlighted = input_params['isHighlighted']
+		thread_id = input_params['thread']
+		forum_name = input_params['forum']
+		isDeleted = input_params['isDeleted']
+		isEdited = input_params['isEdited']
+
+		
+
+		
+		#logger.error(name)
+		user = User.objects.get(email = user_email)
+		#logger.error("GET1")
+		thread = Thread.objects.get(id = thread_id)
+		#logger.error("GET2")
+		forum = Forum.objects.get(short_name = forum_name)
+		#logger.error("GET3")
+		post = Post(date = date, user = user, thread = thread, forum = forum, isApproved = isApproved, isHighlighted = isHighlighted, 
+			isEdited = isEdited, isSpam = isSpam, isDeleted = isDeleted, message = message, parent = 0)
+		post.save()
+
+		#logger.error("CREATED")
+		
+		json_response['id'] = post.id
+		json_response['date'] = post.date
+		json_response['forum'] = forum.short_name
+		json_response['isApproved'] = post.isApproved
+		json_response['isDeleted'] = post.isDeleted
+		json_response['isEdited'] = post.isEdited
+		json_response['isHighlighted'] = post.isHighlighted
+		json_response['isSpam'] = post.isSpam
+		json_response['message'] = post.message
+		json_response['parent'] = post.parent
+		json_response['thread'] = thread.id
+		json_response['user'] = user.email
+
+
+	#logger.error("Done")
+	main_response['response'] = json_response;
+	response = JsonResponse(main_response)
+
+	return response
+
+# Requesting http://some.host.ru/db/api/thread/create/ with
+#  {"forum": "forum1", "title": "Thread With Sufficiently Large Title", 
+#  "isClosed": true, "user": "example3@mail.ru", "date": "2014-01-01 00:00:01",
+#   "message": "hey hey hey hey!", "slug": "Threadwithsufficientlylargetitle", "isDeleted": true}:
+def thread_create(request):
+	#logger.error("THREAD:")
+	main_response = {'code':0}
+	json_response = {}
+	if request.method == 'POST':
+		input_params = json.loads(request.body)
+		
+		
+		#logger.error(request.body)
+		
+		forum_name = input_params['forum']
+		title = input_params['title']
+		isClosed = input_params['isClosed']
+		user_email = input_params['user']
+		date = input_params['date']
+		message = input_params['message']
+		slug = input_params['slug']	
+		isDeleted = input_params['isDeleted']
+
+		
+
+		#logger.error("DONE")
+		#logger.error(name)
+		#try:
+		user = User.objects.get(email = user_email)
+		forum = Forum.objects.get(short_name = forum_name)
+
+		thread = Thread (date = date, user =user, forum = forum, title = title, slug = slug, message = message,
+			isClosed = isClosed, isDeleted = isDeleted)
+		thread.save()
+
+		json_response['id'] = thread.id
+		json_response['date'] = thread.date
+		json_response['forum'] = forum.short_name
+		json_response['isClosed'] = thread.isClosed
+		json_response['isDeleted'] = thread.isDeleted
+		json_response['message'] = thread.message
+		json_response['title'] = thread.title
+		json_response['user'] = user_email
+		#logger.error("THREAD CREATED")
+
 
 	#logger.error("Done")
 	main_response['response'] = json_response;

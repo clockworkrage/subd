@@ -26,7 +26,7 @@ class Thread(models.Model):
 	forum = models.ForeignKey(Forum)
 	title = models.CharField(max_length = 50, default='title')
 	slug = models.CharField(max_length = 50, default='title')
-	message = models.CharField(max_length = 150, default='message')
+	message = models.TextField(max_length = 500, default='message')
 	isClosed = models.BooleanField(default=False)
 	isDeleted = models.BooleanField(default=False)
 	subscribe = models.ManyToManyField(User, related_name='%(class)s_user_subs')

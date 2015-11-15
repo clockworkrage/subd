@@ -2,10 +2,10 @@ from django.db import models
 
 
 class User(models.Model):
-	name = models.CharField(max_length = 50, default='name')
-	username = models.CharField(max_length = 50, default='username')
+	name = models.CharField(max_length = 50, null=True)
+	username = models.CharField(max_length = 50, null=True)
 	isAnonymous = models.BooleanField(default=False)
-	email = models.CharField(max_length = 50, default='email')
+	email = models.CharField(max_length = 50, null=True)
 	about = models.TextField(max_length = 700, default='about')
 	follow = models.ManyToManyField("self", symmetrical=False)
 

@@ -73,7 +73,7 @@ def get_post_info(post_details, related):
 	info['points']			= post_details.points
 
 	if find_list(related, 'thread'):
-		info['thread']	= get_thread_info(post_details.thread)
+		info['thread']	= get_thread_info(post_details.thread, [])
 	else:
 		info['thread']	= post_details.thread.id
 

@@ -11,6 +11,7 @@ from django.utils import dateformat
 from django.conf import settings
 from user import get_user_info
 from post import get_post_info
+from thread import get_thread_info
 
 logger = logging.getLogger(__name__)
 #Requesting http://some.host.ru/db/api/forum/create/ with {"name": "Forum With Sufficiently Large Name", "short_name": "forumwithsufficientlylargename", "user": "richard.nixon@example.com"}:
@@ -89,12 +90,11 @@ def forum_listPosts(request):
 	main_response = {'code':0}
 	
 	if request.method == 'GET':
-		#logger.error("user_email")
-		#logger.error(request.body)
-		since = request.GET['since']
+		since = request.GET.get('since', 0)
 		order = request.GET['order']
 		forum_name = request.GET['forum']
-		related = request.GET.get('related', [])
+		limit = request.GET.get('limit', 0)
+		related = request.GET.getlist('related')
 
 		if order == 'desc':
 			sort_order = '-date'
@@ -104,16 +104,120 @@ def forum_listPosts(request):
 		post_list = []
 
 		forum = Forum.objects.get(short_name = forum_name)
-		post_list = list(Post.objects.values_list('id', flat=True).filter(forum=forum, date__gt=since).order_by(sort_order))
+		if since !=0:
+			if limit != 0:
+				post_list = list(Post.objects.values_list('id', flat=True).filter(forum=forum, date__gt=since).order_by(sort_order)[:limit])
+			else:
+				post_list = list(Post.objects.values_list('id', flat=True).filter(forum=forum, date__gt=since).order_by(sort_order))
+		else:
+			if limit != 0:
+				post_list = list(Post.objects.values_list('id', flat=True).filter(forum=forum).order_by(sort_order)[:limit])
+			else:
+				post_list = list(Post.objects.values_list('id', flat=True).filter(forum=forum).order_by(sort_order))
+		
+		out_list = []
+
+
+		for out_post_id in post_list:
+			out_post = Post.objects.get(id = out_post_id)
+			out_list.append(get_post_info(out_post, related))
+
+		json_response = out_list
+
+
+	#logger.error("Done")
+	main_response['response'] = json_response
+
+	response = JsonResponse(main_response)
+
+	return response
+
+#Requesting http://some.host.ru/db/api/forum/listThreads/?related=forum&since=2013-12-31+00%3A00%3A00&order=desc&forum=forum1:
+def forum_listThreads(request):
+
+	main_response = {'code':0}
+	
+	if request.method == 'GET':
+		since = request.GET['since']
+		order = request.GET['order']
+		forum_name = request.GET['forum']
+		related = request.GET.getlist('related')
+
+		if order == 'desc':
+			sort_order = '-date'
+		else:
+			sort_order = 'date'
+
+		thread_list = []
+
+		forum = Forum.objects.get(short_name = forum_name)
+		thread_list = list(Thread.objects.values_list('id', flat=True).filter(forum=forum, date__gt=since).order_by(sort_order))
 
 		out_list = []
 
 		#logger.error("user_email22")
 		#logger.error(name)
 		#logger.error(user)
-		for out_post_id in post_list:
-			out_post = Post.objects.get(id = out_post_id)
-			out_list.append(get_post_info(out_post, related))
+		for out_thread_id in thread_list:
+			out_thread = Thread.objects.get(id = out_thread_id)
+			out_list.append(get_thread_info(out_thread, related))
+
+		json_response = out_list
+
+
+	#logger.error("Done")
+	main_response['response'] = json_response
+
+	response = JsonResponse(main_response)
+
+	return response
+
+#Requesting http://some.host.ru/db/api/forum/listUsers/?order=desc&forum=forum1:
+def forum_listUsers(request):
+
+	main_response = {'code':0}
+	
+	if request.method == 'GET':
+		since = int(request.GET.get('since', 0))
+		order = request.GET.get('order', 'DESC')
+		limit = int(request.GET.get('limit', 0))
+		forum_name = request.GET['forum']
+
+		sort_order = ''
+		limit_string = ''
+		since_string = ''
+		if order == 'DESC':
+			sort_order = " ORDER BY subdapp_user.name DESC"
+		if order == 'ASC':
+			sort_order = " ORDER BY subdapp_user.name ASC"
+		if limit > 0:
+			limit_string = "LIMIT %d" % limit
+		if since > 0:
+			since_string = "AND subdapp_user.id >= %d" % since
+		user_list = []
+
+		# forum = Forum.objects.get(short_name = forum_name)
+		# user_list = list(Thread.objects.values_list('user', flat=True).filter(forum=forum)) #.order_by()
+
+		out_list = []
+
+		# # for out_thread_id in thread_list:
+		# # 	out_thread = Thread.objects.get(id = out_thread_id)
+		# # 	out_list.append(get_thread_info(out_thread, related))
+		cursor = connection.cursor()
+		query = "SELECT DISTINCT subdapp_user.id FROM subdapp_user INNER JOIN subdapp_post ON subdapp_user.id = subdapp_post.user_id \
+			INNER JOIN subdapp_forum ON subdapp_post.forum_id = subdapp_forum.id \
+			WHERE subdapp_forum.short_name = \"%s\" %s \
+			%s %s" % (forum_name, since_string, " ORDER BY subdapp_user.name ASC", limit_string)
+		cursor.execute(query)
+#forum_name, since_string,
+		for row in cursor.fetchall():
+			user_list.append(row[0])
+
+
+		for out_user_id in user_list:
+		 	out_user = User.objects.get(id = out_user_id)
+		 	out_list.append(get_user_info(out_user))
 
 		json_response = out_list
 

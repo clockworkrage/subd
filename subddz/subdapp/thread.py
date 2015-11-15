@@ -9,9 +9,63 @@ from django.db.models.fields.related import ManyToManyField
 from django.core import serializers
 from django.utils import dateformat
 from django.conf import settings
+from user import get_user_info
 
 logger = logging.getLogger(__name__)
 
+def find_list(search_list, value):
+
+	for element in search_list:
+		if element == value:
+			return True;
+
+	return False
+
+def get_forum_info(forum_details):
+
+	info = {}
+
+	info['id']			= forum_details.id
+	info['name']		= forum_details.name
+	info['short_name']	= forum_details.short_name
+	info['user']		= forum_details.user.email
+
+	return info
+
+def get_post_info(post_details, related):
+
+	info = {}
+
+	info['date']			= dateformat.format(post_details.date, settings.DATETIME_FORMAT)
+	info['dislikes']		= post_details.dislikes
+
+	if find_list(related, 'forum'):
+		info['forum']	= get_forum_info(post_details.forum)
+	else:
+		info['forum']	= post_details.forum.short_name
+	info['id']				= post_details.id
+	info['isApproved']		= post_details.isApproved
+	info['isDeleted']		= post_details.isDeleted
+	info['isEdited']		= post_details.isEdited
+	info['isHighlighted']	= post_details.isHighlighted
+	info['isSpam']			= post_details.isSpam
+	info['likes']			= post_details.likes
+	info['message']			= post_details.message
+	if post_details.parent != 0:
+		info['parent']		= post_details.parent
+	info['points']			= post_details.points
+
+	if find_list(related, 'thread'):
+		info['thread']	= get_thread_info(post_details.thread, [])
+	else:
+		info['thread']	= post_details.thread.id
+
+	if find_list(related, 'user'):
+		info['user']	= get_user_info(post_details.user)
+	else:
+		info['user']	= post_details.user.email
+
+	return info
 # Requesting http://some.host.ru/db/api/thread/create/ with
 #  {"forum": "forum1", "title": "Thread With Sufficiently Large Title", 
 #  "isClosed": true, "user": "example3@mail.ru", "date": "2014-01-01 00:00:01",
@@ -62,12 +116,17 @@ def thread_create(request):
 
 	return response
 
-def get_thread_info(thread_detail):
+def get_thread_info(thread_detail, related):
 	info = {}
 
 	info['date']		= dateformat.format(thread_detail.date, settings.DATETIME_FORMAT)
 	info['dislikes']	= thread_detail.dislikes
-	info['forum']		= thread_detail.forum.short_name
+	
+	if find_list(related, 'forum'):
+		info['forum']	= get_forum_info(thread_detail.forum)
+	else:
+		info['forum']	= thread_detail.forum.short_name
+
 	info['id']			= thread_detail.id
 	info['isClosed']	= thread_detail.isClosed
 	info['isDeleted']	= thread_detail.isDeleted
@@ -77,7 +136,10 @@ def get_thread_info(thread_detail):
 	info['posts']		= Post.objects.filter(thread = thread_detail, isDeleted = False).count()
 	info['slug']		= thread_detail.slug
 	info['title']		= thread_detail.title
-	info['user']		= thread_detail.user.email
+	if find_list(related, 'user'):
+		info['user']	= get_user_info(thread_detail.user)
+	else:
+		info['user']	= thread_detail.user.email
 	
 	return info
 
@@ -88,12 +150,12 @@ def thread_details(request):
 	if request.method == 'GET':
 
 		thread_id = request.GET['thread']
-		related = request.GET.get('related', '')
+		related = request.GET.getlist('related')
 
 		thread = Thread.objects.get(id = thread_id)
 
 		main_response	= {'code':0}
-		json_response	= get_thread_info(thread)
+		json_response	= get_thread_info(thread, related)
 		#logger.error("READED")
 		# for temp in related:
 		# 	if temp == 'user':
@@ -193,7 +255,7 @@ def thread_update(request):
 
 		main_response = {'code':0}
 
-		json_response	=	get_thread_info(thread)
+		json_response	=	get_thread_info(thread, [])
 
 	#logger.error("Done")
 	main_response['response'] = json_response;
@@ -229,7 +291,7 @@ def thread_vote(request):
 
 		main_response = {'code':0}
 
-		json_response	=	get_thread_info(thread)
+		json_response	=	get_thread_info(thread, [])
 
 	#logger.error("Done")
 	main_response['response'] = json_response;
@@ -312,6 +374,10 @@ def thread_remove(request):
 
 		thread.save(update_fields=['isDeleted'])
 
+		cursor = connection.cursor()
+		cursor.execute("UPDATE subdapp_post SET isDeleted=1 WHERE thread_id=%s",[thread.id])
+		connection.commit()
+
 		main_response = {'code':0}
 
 		json_response['thread']	= thread_id
@@ -336,6 +402,10 @@ def thread_restore(request):
 		thread.isDeleted = False
 
 		thread.save(update_fields=['isDeleted'])
+
+		cursor = connection.cursor()
+		cursor.execute("UPDATE subdapp_post SET isDeleted=0 WHERE thread_id=%s",[thread.id])
+		connection.commit()
 
 		main_response = {'code':0}
 
@@ -377,7 +447,44 @@ def thread_list(request):
 
 		for out_thread_id in thread_list:
 			out_thread = Thread.objects.get(id = out_thread_id)
-			out_list.append(get_thread_info(out_thread))
+			out_list.append(get_thread_info(out_thread, []))
+
+		main_response = {'code':0}
+		json_response = out_list
+		
+	main_response['response'] = json_response
+	response = JsonResponse(main_response)
+
+	return response
+
+#Requesting http://some.host.ru/db/api/thread/listPosts/?since=2014-01-02+00%3A00%3A00&limit=2&order=asc&thread=3:
+def thread_listPosts(request):
+
+	main_response = {}
+	json_response = {}
+	if request.method == 'GET':
+
+		thread_id = request.GET.get('thread', 0)
+		limit = request.GET.get('limit', 0)
+		sort_type = request.GET.get('sort', 'flat')
+		order = request.GET.get('order', 'desc')
+		since = request.GET.get('since', 0)
+
+		post_list = []
+		sort_order = ''
+		if order == 'desc':
+			sort_order = '-date'
+		else:
+			sort_order = 'date'
+		if since != 0:
+			post_list = list(Post.objects.values_list('id', flat=True).filter(thread_id=thread_id, date__gt=since).order_by(sort_order))
+		else:
+			post_list = list(Post.objects.values_list('id', flat=True).filter(thread_id=thread_id).order_by(sort_order))
+		out_list = []
+
+		for out_post_id in post_list:
+			out_post = Post.objects.get(id = out_post_id)
+			out_list.append(get_post_info(out_post, []))
 
 		main_response = {'code':0}
 		json_response = out_list

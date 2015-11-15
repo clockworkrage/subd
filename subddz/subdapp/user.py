@@ -24,7 +24,15 @@ def to_dict(instance):
 		else:
 			data[f.name] = f.value_from_object(instance)
 	return data
-	
+
+def find_list(search_list, value):
+
+	for element in search_list:
+		if element == value:
+			return True;
+
+	return False
+
 def user_create(request):
 
 	main_response = {}
@@ -44,9 +52,9 @@ def user_create(request):
 		email = input_params['email']
 
 		if isAnon:
-			about = "Null"
-			name = "Null"
-			username = "Null"
+			about = ''
+			name = ''
+			username = ''
 		else:
 			about = input_params['about']
 			name = input_params['name']
@@ -108,6 +116,44 @@ def get_user_info(user_detail):
 	
 	return info
 
+def get_post_info(post_details, related):
+
+	info = {}
+
+	info['date']			= dateformat.format(post_details.date, settings.DATETIME_FORMAT)
+	info['dislikes']		= post_details.dislikes
+
+	if find_list(related, 'forum'):
+		info['forum']	= get_forum_info(post_details.forum)
+	else:
+		info['forum']	= post_details.forum.short_name
+
+	info['id']				= post_details.id
+	info['isApproved']		= post_details.isApproved
+	info['isDeleted']		= post_details.isDeleted
+	info['isEdited']		= post_details.isEdited
+	info['isHighlighted']	= post_details.isHighlighted
+	info['isSpam']			= post_details.isSpam
+	info['likes']			= post_details.likes
+	info['message']			= post_details.message
+	if post_details.parent != 0:
+		info['parent']		= post_details.parent
+	info['points']			= post_details.points
+
+	if find_list(related, 'thread'):
+		info['thread']	= get_thread_info(post_details.thread, [])
+	else:
+		info['thread']	= post_details.thread.id
+
+	if find_list(related, 'user'):
+		info['user']	= get_user_info(post_details.user)
+	else:
+		info['user']	= post_details.user.email
+
+
+
+	return info
+
 #Requesting http://some.host.ru/db/api/user/details/?user=example%40mail.ru:	
 def user_details(request):
 
@@ -146,6 +192,38 @@ def user_follow(request):
 		#logger.error(followee_user)
 
 		follower_user.follow.add(followee_user)
+
+		main_response = {'code':0}
+
+		json_response = get_user_info(follower_user)
+
+	
+
+	main_response['response'] = json_response;
+	response = JsonResponse(main_response)
+
+	return response
+
+def user_unfollow(request):
+
+	main_response = {}
+	json_response = {}
+
+	if request.method == 'POST':
+	#for key in request.GET:
+		#logger.error(r"ssss")
+		input_params = json.loads(request.body)
+
+		follower_email = input_params['follower']
+		followee_email = input_params['followee']
+		json_response = {}
+
+		
+		follower_user = User.objects.get(email = follower_email)
+		followee_user = User.objects.get(email = followee_email)
+
+
+		follower_user.follow.remove(followee_user)
 
 		main_response = {'code':0}
 
@@ -215,6 +293,87 @@ def user_listFollowers(request):
 		for follower in followers_list:
 			follow_user = User.objects.get(email = follower)
 			out_list.append(get_user_info(follow_user))
+
+		main_response = {'code':0}
+		json_response = out_list
+		
+	main_response['response'] = json_response
+	response = JsonResponse(main_response)
+
+	return response
+
+def user_listFollowing(request):
+	#logger.error("user_listFollowers")
+	main_response = {}
+	json_response = {}
+	if request.method == 'GET':
+
+		user_email = request.GET['user']
+		order = request.GET['order']
+		limit = request.GET.get('limit', 0)
+		offset = request.GET.get('since_id', 0)
+
+		#logger.error("reeaded")
+		user = User.objects.get(email = user_email)
+
+		if order == 'desc':
+			sort_order = '-name'
+		else:
+			sort_order = 'name'
+
+		following_list = []
+
+		if (limit != 0) and (offset != 0):
+			following_list = list(user.follow.values_list('email', flat=True).filter(id__gt=offset).order_by(sort_order)[:limit])
+		else:
+			following_list = list(user.follow.values_list('email', flat=True).filter().order_by(sort_order))
+		
+		out_list = []
+
+		for following in following_list:
+			following_user = User.objects.get(email = following)
+			out_list.append(get_user_info(following_user))
+
+		main_response = {'code':0}
+		json_response = out_list
+		
+	main_response['response'] = json_response
+	response = JsonResponse(main_response)
+
+	return response
+
+#Requesting http://some.host.ru/db/api/user/listPosts/?since=2014-01-02+00%3A00%3A00&limit=2&user=example%40mail.ru&order=asc:
+def user_listPosts(request):
+	#logger.error("user_listFollowers")
+	main_response = {}
+	json_response = {}
+	if request.method == 'GET':
+
+		user_email = request.GET['user']
+		order = request.GET['order']
+		limit = request.GET.get('limit', 0)
+		since = request.GET.get('since', 0)
+
+		#logger.error("reeaded")
+		user = User.objects.get(email = user_email)
+
+		if order == 'desc':
+			sort_order = '-date'
+		else:
+			sort_order = 'date'
+
+		post_list = []
+
+		if (limit != 0):
+			post_list = list(Post.objects.values_list('id', flat=True).filter(user=user, date__gt=since).order_by(sort_order)[:limit])
+		else:
+			post_list = list(Post.objects.values_list('id', flat=True).filter(user=user, date__gt=since).order_by(sort_order))
+		
+		out_list = []
+
+		for post_id in post_list:
+			post_user = Post.objects.get(id = post_id)
+			out_list.append(get_post_info(post_user, []))
 
 		main_response = {'code':0}
 		json_response = out_list

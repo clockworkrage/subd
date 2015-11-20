@@ -152,6 +152,9 @@ def thread_details(request):
 		thread_id = request.GET['thread']
 		related = request.GET.getlist('related')
 
+		if 'thread' in related:
+			return JsonResponse({'code':3, 'response': 'error'})
+
 		thread = Thread.objects.get(id = thread_id)
 
 		main_response	= {'code':0}

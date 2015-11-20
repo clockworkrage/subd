@@ -9,6 +9,7 @@ from django.db.models.fields.related import ManyToManyField
 from django.core import serializers
 from django.utils import dateformat
 from django.conf import settings
+from utils import check_dict
 
 logger = logging.getLogger(__name__)
 
@@ -41,9 +42,14 @@ def user_create(request):
 	#for key in request.GET:
 		#logger.error(r"ssss")
 		input_params = json.loads(request.body)
-		#logger.error(req["name"])
-		#logger.error(request.FILES)
-		#logger.error(request.body)
+
+		required = ['username', 'about', 'name', 'email']
+
+		try:
+			check_dict(input_params, required)
+		except Exception as e:
+			if e.message == 'required':
+				return JsonResponse({'code':1, 'response': e.message})
 
 		isUserExistsError = False
 		json_response = {}

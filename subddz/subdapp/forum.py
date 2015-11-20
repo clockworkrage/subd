@@ -12,6 +12,7 @@ from django.conf import settings
 from user import get_user_info
 from post import get_post_info
 from thread import get_thread_info
+from utils import check_dict
 
 logger = logging.getLogger(__name__)
 #Requesting http://some.host.ru/db/api/forum/create/ with {"name": "Forum With Sufficiently Large Name", "short_name": "forumwithsufficientlylargename", "user": "richard.nixon@example.com"}:
@@ -64,6 +65,14 @@ def forum_details(request):
 	main_response = {}
 	json_response = {}
 	if request.method == 'GET':
+		required = ['forum']
+
+		try:
+			check_dict(request.GET, required)
+		except Exception as e:
+			if e.message == 'required':
+				return JsonResponse({'code':1, 'response': e.message})
+
 		short_name = request.GET['forum']
 		related = request.GET['related']
 
@@ -186,10 +195,12 @@ def forum_listUsers(request):
 		sort_order = ''
 		limit_string = ''
 		since_string = ''
-		if order == 'DESC':
+
+		sort_order = " ORDER BY subdapp_user.name ASC"
+
+		if order == 'desc':
 			sort_order = " ORDER BY subdapp_user.name DESC"
-		if order == 'ASC':
-			sort_order = " ORDER BY subdapp_user.name ASC"
+		
 		if limit > 0:
 			limit_string = "LIMIT %d" % limit
 		if since > 0:
@@ -208,7 +219,7 @@ def forum_listUsers(request):
 		query = "SELECT DISTINCT subdapp_user.id FROM subdapp_user INNER JOIN subdapp_post ON subdapp_user.id = subdapp_post.user_id \
 			INNER JOIN subdapp_forum ON subdapp_post.forum_id = subdapp_forum.id \
 			WHERE subdapp_forum.short_name = \"%s\" %s \
-			%s %s" % (forum_name, since_string, " ORDER BY subdapp_user.name ASC", limit_string)
+			%s %s" % (forum_name, since_string, sort_order, limit_string)
 		cursor.execute(query)
 #forum_name, since_string,
 		for row in cursor.fetchall():

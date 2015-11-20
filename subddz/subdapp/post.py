@@ -153,12 +153,14 @@ def post_details(request):
 
 		post_id = request.GET['post']
 		related = request.GET.get('related',[])
+		try:
+			main_response	= {'code':0}
+			post = Post.objects.get(id = post_id)
+			json_response	=	get_post_info(post, related)
+		except Exception as e:
+			return JsonResponse({'code':1, 'response': e.message})
 
-		post = Post.objects.get(id = post_id)
-
-		main_response	= {'code':0}
-
-		json_response	=	get_post_info(post, related)
+		
 
 		#logger.error("READED")
 		# for temp in related:
@@ -309,11 +311,16 @@ def post_list(request):
 			sort_order = 'date'
 		if forum_name != '':
 			forum = Forum.objects.get(short_name = forum_name)
-			post_list = list(Post.objects.values_list('id', flat=True).filter(forum=forum, date__gt=since).order_by(sort_order))
+			if limit != 0:
+				post_list = list(Post.objects.values_list('id', flat=True).filter(forum=forum, date__gt=since).order_by(sort_order)[:limit])
+			else:
+				post_list = list(Post.objects.values_list('id', flat=True).filter(forum=forum, date__gt=since).order_by(sort_order))
 		if thread_id != '':
 			thread = Thread.objects.get(id = thread_id)
-			post_list = list(Post.objects.values_list('id', flat=True).filter(thread=thread, date__gt=since).order_by(sort_order))
-
+			if limit != 0:
+				post_list = list(Post.objects.values_list('id', flat=True).filter(thread=thread, date__gt=since).order_by(sort_order)[:limit])
+			else:
+				post_list = list(Post.objects.values_list('id', flat=True).filter(thread=thread, date__gt=since).order_by(sort_order))
 		out_list = []
 
 		for out_post_id in post_list:

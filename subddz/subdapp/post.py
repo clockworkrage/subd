@@ -2,7 +2,6 @@
 from django.shortcuts import render
 from django.http import JsonResponse
 from subdapp.models import User, Forum, Thread, Post
-import logging
 import json
 from django.db import connection
 from django.db.models.fields.related import ManyToManyField
@@ -12,7 +11,6 @@ from django.conf import settings
 from user import get_user_info
 from thread import get_thread_info
 
-logger = logging.getLogger(__name__)
 
 def get_forum_info(forum_details):
 

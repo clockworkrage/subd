@@ -2,7 +2,6 @@
 from django.shortcuts import render
 from django.http import JsonResponse
 from subdapp.models import User, Forum, Thread, Post
-import logging
 import json
 from django.db import connection
 from django.db.models.fields.related import ManyToManyField
@@ -11,7 +10,6 @@ from django.utils import dateformat
 from django.conf import settings
 from utils import check_dict
 
-logger = logging.getLogger(__name__)
 
 def to_dict(instance):
 	opts = instance._meta
@@ -39,8 +37,7 @@ def user_create(request):
 	main_response = {}
 	
 	if request.method == 'POST':
-	#for key in request.GET:
-		#logger.error(r"ssss")
+
 		input_params = json.loads(request.body)
 
 		required = ['username', 'about', 'name', 'email']

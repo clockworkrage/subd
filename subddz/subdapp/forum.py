@@ -2,7 +2,6 @@
 from django.shortcuts import render
 from django.http import JsonResponse
 from subdapp.models import User, Forum, Thread, Post
-import logging
 import json
 from django.db import connection
 from django.db.models.fields.related import ManyToManyField
@@ -14,7 +13,6 @@ from post import get_post_info
 from thread import get_thread_info
 from utils import check_dict
 
-logger = logging.getLogger(__name__)
 #Requesting http://some.host.ru/db/api/forum/create/ with {"name": "Forum With Sufficiently Large Name", "short_name": "forumwithsufficientlylargename", "user": "richard.nixon@example.com"}:
 
 def get_forum_info(forum_details):
@@ -34,18 +32,15 @@ def forum_create(request):
 	
 	if request.method == 'POST':
 		input_params = json.loads(request.body)
-		#logger.error("user_email")
-		#logger.error(request.body)
+
 
 		name = input_params['name']
 		short_name = input_params['short_name']
 		user_email = input_params['user']
 		
 
-		#logger.error("user_email22")
-		#logger.error(name)
 		user = User.objects.get(email = user_email)
-		#logger.error(user)
+
 		forum = Forum(name=name, short_name=short_name, user=user)
 		forum.save()
 
@@ -55,7 +50,7 @@ def forum_create(request):
 		json_response['short_name'] = forum.short_name
 		json_response['user'] = user.email
 
-	#logger.error("Done")
+
 	main_response['response'] = json_response;
 	response = JsonResponse(main_response)
 
@@ -134,7 +129,6 @@ def forum_listPosts(request):
 		json_response = out_list
 
 
-	#logger.error("Done")
 	main_response['response'] = json_response
 
 	response = JsonResponse(main_response)
@@ -164,9 +158,7 @@ def forum_listThreads(request):
 
 		out_list = []
 
-		#logger.error("user_email22")
-		#logger.error(name)
-		#logger.error(user)
+
 		for out_thread_id in thread_list:
 			out_thread = Thread.objects.get(id = out_thread_id)
 			out_list.append(get_thread_info(out_thread, related))
@@ -174,7 +166,7 @@ def forum_listThreads(request):
 		json_response = out_list
 
 
-	#logger.error("Done")
+
 	main_response['response'] = json_response
 
 	response = JsonResponse(main_response)
@@ -233,7 +225,6 @@ def forum_listUsers(request):
 		json_response = out_list
 
 
-	#logger.error("Done")
 	main_response['response'] = json_response
 
 	response = JsonResponse(main_response)

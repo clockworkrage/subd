@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from django.shortcuts import render
 from django.http import JsonResponse
-from subdapp.models import User, Forum, Thread, Post
+from subdapp.models import User, Forum, Thread, Post, User_Post_Forum, User_Thread, User_Post_Thread
 import logging
 import json
 from django.db import connection
@@ -31,29 +31,36 @@ def index(request):
 	return response
 
 def clear(request):
-	cursor = connection.cursor()
 
-	cursor.execute("DELETE FROM subdapp_forum")
-	connection.commit()
-	cursor.execute("DELETE FROM subdapp_user_follow")
-	connection.commit()
+	# cursor = connection.cursor()
 
-	cursor.execute("DELETE FROM subdapp_thread_subscribe")
-	connection.commit()
+	# cursor.execute("DELETE FROM subdapp_forum")
+	# connection.commit()
+	# cursor.execute("DELETE FROM subdapp_user_follow")
+	# connection.commit()
+
+	# cursor.execute("DELETE FROM subdapp_thread_subscribe")
+	# connection.commit()
 	
-	cursor.execute("DELETE FROM subdapp_user;")
-	connection.commit()
+	# cursor.execute("DELETE FROM subdapp_user;")
+	# connection.commit()
 
-	cursor.execute("DELETE FROM subdapp_forum") 
-	connection.commit()
+	# cursor.execute("DELETE FROM subdapp_forum") 
+	# connection.commit()
 
-	cursor.execute("DELETE FROM subdapp_thread")
-	connection.commit()
+	# cursor.execute("DELETE FROM subdapp_thread")
+	# connection.commit()
 
-	cursor.execute("DELETE FROM subdapp_post")
-	connection.commit()
+	# cursor.execute("DELETE FROM subdapp_post")
+	# connection.commit()
+	User.objects.all().delete()
+	Forum.objects.all().delete()
+	Thread.objects.all().delete()
+	Post.objects.all().delete()
+	User_Post_Forum.objects.all().delete()
+	User_Thread.objects.all().delete()
+	User_Post_Thread.objects.all().delete()
 	
-
 	main_responce = {'code':0}
 	main_responce['response'] = "OK"
 

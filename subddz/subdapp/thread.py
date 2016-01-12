@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from django.shortcuts import render
 from django.http import JsonResponse
-from subdapp.models import User, Forum, Thread, Post
+from subdapp.models import User, Forum, Thread, Post, User_Thread
 import json
 from django.db import connection
 from django.db.models.fields.related import ManyToManyField
@@ -96,6 +96,10 @@ def thread_create(request):
 		thread = Thread (date = thread_date, user =user, forum = forum, title = title, slug = slug, message = message,
 			isClosed = isClosed, isDeleted = isDeleted)
 		thread.save()
+
+		#num_results = User_Post_Forum.objects.filter(user = user, short_name = forum.short_name).count()
+		userthread = User_Thread(short_name = forum.short_name, thread_id = thread.id, email = user_email, count = 0)
+		userthread.save()
 
 		json_response['id'] = thread.id
 		json_response['date'] = thread.date
@@ -378,7 +382,8 @@ def thread_remove(request):
 		cursor = connection.cursor()
 		cursor.execute("UPDATE subdapp_post SET isDeleted=1 WHERE thread_id=%s",[thread.id])
 		connection.commit()
-
+		cursor.close()
+		
 		main_response = {'code':0}
 
 		json_response['thread']	= thread_id
@@ -407,6 +412,7 @@ def thread_restore(request):
 		cursor = connection.cursor()
 		cursor.execute("UPDATE subdapp_post SET isDeleted=0 WHERE thread_id=%s",[thread.id])
 		connection.commit()
+		cursor.close()
 
 		main_response = {'code':0}
 
@@ -425,30 +431,83 @@ def thread_list(request):
 	json_response = {}
 	if request.method == 'GET':
 
-		since = request.GET['since']
-		order = request.GET['order']
-		limit = request.GET.get('limit', 0)
+		since_date = request.GET.get('since')
+		order = request.GET.get('order')
+		limit = int(request.GET.get('limit', 0))
 		forum_name = request.GET.get('forum', '')
 		user_email = request.GET.get('user', '')
 
-		thread_list = []
+		# if order == 'desc':
+		# 	sort_order = '-date'
+		# else:
+		# 	sort_order = 'date'
+		# if forum_name != '':
+		# 	forum = Forum.objects.get(short_name = forum_name)
+		# 	if since != None:
+		# 		thread_list = list(Thread.objects.values_list('id', flat=True).filter(forum=forum, date__gt=since).order_by(sort_order))
+		# 	else:
+		# 		thread_list = list(Thread.objects.values_list('id', flat=True).filter(forum=forum).order_by(sort_order))
+		# if user_email != '':
+		# 	user = User.objects.get(email = user_email)
+		# 	if since != None:
+		# 		thread_list = list(Thread.objects.values_list('id', flat=True).filter(user=user, date__gt=since).order_by(sort_order))
+		# 	else:
+		# 		thread_list = list(Thread.objects.values_list('id', flat=True).filter(user=user).order_by(sort_order))
+
+		sort_order = " ORDER BY st.date ASC"
 
 		if order == 'desc':
-			sort_order = '-date'
-		else:
-			sort_order = 'date'
-		if forum_name != '':
-			forum = Forum.objects.get(short_name = forum_name)
-			thread_list = list(Thread.objects.values_list('id', flat=True).filter(forum=forum, date__gt=since).order_by(sort_order))
-		if user_email != '':
-			user = User.objects.get(email = user_email)
-			thread_list = list(Thread.objects.values_list('id', flat=True).filter(user=user, date__gt=since).order_by(sort_order))
+			sort_order = " ORDER BY st.date DESC"
+
+		limit_string = ""
+
+		if limit > 0:
+			limit_string = "LIMIT %d" % limit
+
+		since =""
+
+		if since_date != None:
+			since = " AND st.date > \'%s\'" % since_date
 
 		out_list = []
 
-		for out_thread_id in thread_list:
-			out_thread = Thread.objects.get(id = out_thread_id)
-			out_list.append(get_thread_info(out_thread, []))
+		query = ""
+
+		if forum_name != '':
+			query = "SELECT st.*, sut.short_name, sut.email, sut.count  FROM subdapp_thread st  INNER JOIN  subdapp_user_thread sut ON st.id = sut.thread_id WHERE sut.short_name = \"%s\" \
+			%s %s %s" % (forum_name, since, sort_order, limit_string)
+		else:
+			query = "SELECT st.*, sut.short_name, sut.email, sut.count   FROM subdapp_thread st  INNER JOIN  subdapp_user_thread sut ON st.id = sut.thread_id WHERE sut.email = \"%s\"  \
+			%s %s %s" % (user_email, since, sort_order, limit_string)
+
+		cursor = connection.cursor()
+		cursor.execute(query)
+		result_threads = cursor.fetchall()
+		cursor.close()
+		out_list = []
+
+		# for out_thread_id in thread_list:
+		# 	out_thread = Thread.objects.get(id = out_thread_id)
+		# 	out_list.append(get_thread_info(out_thread, []))
+		if len(result_threads) > 0:
+			for thread_res in result_threads:
+				#logger.error(post_res)
+				info={}
+				info['date']		= dateformat.format(thread_res[1], settings.DATETIME_FORMAT)
+				info['dislikes']	= thread_res[9]
+				info['forum']	= thread_res[12]
+				info['id']			= thread_res[0]
+				info['isClosed']	= thread_res[5]
+				info['isDeleted']	= thread_res[6]
+				info['likes']		= thread_res[11]
+				info['message']		= thread_res[4]
+				info['points']		= thread_res[10]
+				info['posts']		= thread_res[14]
+				info['slug']		= thread_res[3]
+				info['title']		= thread_res[2]
+				info['user']	= thread_res[13]
+
+				out_list.append(info)
 
 		main_response = {'code':0}
 		json_response = out_list
@@ -466,26 +525,76 @@ def thread_listPosts(request):
 	if request.method == 'GET':
 
 		thread_id = request.GET.get('thread', 0)
-		limit = request.GET.get('limit', 0)
+		limit = int(request.GET.get('limit', 0))
 		sort_type = request.GET.get('sort', 'flat')
 		order = request.GET.get('order', 'desc')
-		since = request.GET.get('since', 0)
+		since_date = request.GET.get('since')
+
+		# post_list = []
+		# sort_order = ''
+		# if order == 'desc':
+		# 	sort_order = '-date'
+		# else:
+		# 	sort_order = 'date'
+		# if since != 0:
+		# 	post_list = list(Post.objects.values_list('id', flat=True).filter(thread_id=thread_id, date__gt=since).order_by(sort_order))
+		# else:
+		# 	post_list = list(Post.objects.values_list('id', flat=True).filter(thread_id=thread_id).order_by(sort_order))
+		# out_list = []
+
+
+
+		# for out_post_id in post_list:
+		# 	out_post = Post.objects.get(id = out_post_id)
+		# 	out_list.append(get_post_info(out_post, []))
 
 		post_list = []
-		sort_order = ''
+
+		sort_order = " ORDER BY sp.date ASC"
+
 		if order == 'desc':
-			sort_order = '-date'
-		else:
-			sort_order = 'date'
-		if since != 0:
-			post_list = list(Post.objects.values_list('id', flat=True).filter(thread_id=thread_id, date__gt=since).order_by(sort_order))
-		else:
-			post_list = list(Post.objects.values_list('id', flat=True).filter(thread_id=thread_id).order_by(sort_order))
+			sort_order = " ORDER BY sp.date DESC"
+
+		limit_string = ""
+
+		if limit > 0:
+			limit_string = "LIMIT %d" % limit
+
+		since =""
+
+		if since_date != None:
+			since = " AND sp.date > \'%s\'" % since_date
+
 		out_list = []
 
-		for out_post_id in post_list:
-			out_post = Post.objects.get(id = out_post_id)
-			out_list.append(get_post_info(out_post, []))
+		query = "SELECT sp.*, supt.short_name, supt.email   FROM subdapp_post sp  INNER JOIN  subdapp_user_post_thread supt ON sp.id = supt.post_id WHERE sp.thread_id = %s  \
+		%s %s %s" % (thread_id, since, sort_order, limit_string)
+
+		cursor = connection.cursor()
+		cursor.execute(query)
+		result_posts = cursor.fetchall()
+		cursor.close()
+
+		if len(result_posts) > 0:
+			for post_res in result_posts:
+				#logger.error(post_res)
+				info={}
+				info['date']			= dateformat.format(post_res[1], settings.DATETIME_FORMAT)
+				info['dislikes']		= post_res[12]
+				info['forum']			= post_res[15]
+				info['id']				= post_res[0]
+				info['isApproved']		= post_res[3]
+				info['isDeleted']		= post_res[7]
+				info['isEdited']		= post_res[5]
+				info['isHighlighted']	= post_res[4]
+				info['isSpam']			= post_res[6]
+				info['likes']			= post_res[14]
+				info['message']			= post_res[8]
+				info['parent']			= post_res[2]
+				info['points']			= post_res[13]
+				info['thread']	= post_res[10]
+				info['user']	= post_res[16]
+				out_list.append(info)
 
 		main_response = {'code':0}
 		json_response = out_list

@@ -3,7 +3,6 @@ from django.shortcuts import render
 from django.http import JsonResponse
 from subdapp.models import User, Forum, Thread, Post
 import json
-import logging
 from django.db import connection
 from django.db.models.fields.related import ManyToManyField
 from django.core import serializers
@@ -11,7 +10,6 @@ from django.utils import dateformat
 from django.conf import settings
 from utils import check_dict
 
-logger = logging.getLogger(__name__)
 
 def to_dict(instance):
 	opts = instance._meta
@@ -161,73 +159,17 @@ def get_post_info(post_details, related):
 
 #Requesting http://some.host.ru/db/api/user/details/?user=example%40mail.ru:	
 def user_details(request):
-	#logger.error("USER DETAILS")
-	info = {}
+
 	main_response = {'code':0}
 
 	json_response = {}
 
 	user_email = request.GET['user']
 
-	#user_detail = User.objects.get(email = user_email)
-	query = "SELECT * FROM subdapp_user WHERE email = %s"
-	params = user_email
-	cursor = connection.cursor()
-	cursor.execute(query, params)
-	result_user = cursor.fetchone()
+	user_detail = User.objects.get(email = user_email)
 	
-	params = result_user[0]
-	query = "SELECT su.email FROM subdapp_user_follow suf INNER JOIN subdapp_user su ON suf.from_user_id = su.id  WHERE suf.to_user_id = %s"	
-	
-	cursor.execute(query, params)	
-	result_followers = cursor.fetchall()
+	main_response['response'] = get_user_info(user_detail)
 
-	
-
-	query = "SELECT su.email FROM subdapp_user_follow suf INNER JOIN subdapp_user su ON suf.to_user_id = su.id  WHERE suf.from_user_id = %s"
-	cursor.execute(query, params)	
-	result_following = cursor.fetchall()
-
-	query = "SELECT thread_id FROM subdapp_thread_subscribe  WHERE user_id = %s"
-	cursor.execute(query, params)	
-	result_subscribe = cursor.fetchall()
-
-	cursor.close()
-	
-	#main_response['response'] = get_user_info(user_detail)
-	info['id'] = result_user[0]
-	info['email'] = result_user[4]
-	info['isAnonymous'] = result_user[3]
-
-	if result_user[3] == False:
-		info['name'] = result_user[1]
-		info['username'] = result_user[2]
-		info['about'] = result_user[5]
-	else:
-		info['name'] = None
-		info['username'] = None
-		info['about'] = None
-
-	follower_list = []
-	if len(result_followers) > 0:
-		for follower in result_followers[0]:
-			follower_list.append(follower)
-	info['followers'] = follower_list
-
-	following_list = []
-	if len(result_following) > 0:
-		for following in result_following[0]:
-			following_list.append(following)
-	info['following'] = following_list
-
-	subscribe_list = []
-	if len(result_subscribe) > 0:
-		for subscribe in result_subscribe:
-			subscribe_list.append(subscribe[0])
-
-	info['subscriptions'] = subscribe_list
-	#logger.error(result_subscribe)
-	main_response['response'] = info
 	response = JsonResponse(main_response)
 	return response
 
@@ -413,7 +355,7 @@ def user_listPosts(request):
 		user_email = request.GET['user']
 		order = request.GET['order']
 		limit = request.GET.get('limit', 0)
-		since = request.GET.get('since')
+		since = request.GET.get('since', 0)
 
 		#logger.error("reeaded")
 		user = User.objects.get(email = user_email)
@@ -425,17 +367,10 @@ def user_listPosts(request):
 
 		post_list = []
 
-		
 		if (limit != 0):
-			if since != None:
-				post_list = list(Post.objects.values_list('id', flat=True).filter(user=user, date__gt=since).order_by(sort_order)[:limit])
-			else:
-				post_list = list(Post.objects.values_list('id', flat=True).filter(user=user).order_by(sort_order)[:limit])
+			post_list = list(Post.objects.values_list('id', flat=True).filter(user=user, date__gt=since).order_by(sort_order)[:limit])
 		else:
-			if since != None:
-				post_list = list(Post.objects.values_list('id', flat=True).filter(user=user, date__gt=since).order_by(sort_order))
-			else:
-				post_list = list(Post.objects.values_list('id', flat=True).filter(user=user).order_by(sort_order))
+			post_list = list(Post.objects.values_list('id', flat=True).filter(user=user, date__gt=since).order_by(sort_order))
 		
 		out_list = []
 

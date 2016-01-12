@@ -193,115 +193,51 @@ def forum_listUsers(request):
 		limit_string = ''
 		since_string = ''
 
-		sort_order = " ORDER BY su.name ASC"
+		sort_order = " ORDER BY subdapp_user.name ASC"
 
 		if order == 'desc':
-			sort_order = " ORDER BY su.name DESC"
+			sort_order = " ORDER BY subdapp_user.name DESC"
 		
 		if limit > 0:
 			limit_string = "LIMIT %d" % limit
 		if since > 0:
-			since_string = "AND su.id >= %d" % since
+			since_string = "AND subdapp_user.id >= %d" % since
 		user_list = []
 
 		# forum = Forum.objects.get(short_name = forum_name)
 		# user_list = list(Thread.objects.values_list('user', flat=True).filter(forum=forum)) #.order_by()
 
 		out_list = []
-		followers_list = []
-		following_list = []
-		subscribes_list = []
+
 		# # for out_thread_id in thread_list:
 		# # 	out_thread = Thread.objects.get(id = out_thread_id)
 		# # 	out_list.append(get_thread_info(out_thread, related))
 		cursor = connection.cursor()
-		# query = "SELECT  subdapp_user.id FROM subdapp_user INNER JOIN subdapp_post ON subdapp_user.id = subdapp_post.user_id \
-		# 	INNER JOIN subdapp_forum ON subdapp_post.forum_id = subdapp_forum.id \
-		# 	WHERE subdapp_forum.short_name = \"%s\" %s \
-		# 	GROUP BY subdapp_user.id \
-		# 	%s %s " % (forum_name, since_string, sort_order, limit_string)
-		query = "SELECT su.* FROM subdapp_user_post_forum supf INNER JOIN subdapp_user su ON supf.user_id = su.id \
-			WHERE supf.short_name = \"%s\" %s %s %s" % (forum_name, since_string, sort_order, limit_string)
+		query = "SELECT  subdapp_user.id FROM subdapp_user INNER JOIN subdapp_post ON subdapp_user.id = subdapp_post.user_id \
+			INNER JOIN subdapp_forum ON subdapp_post.forum_id = subdapp_forum.id \
+			WHERE subdapp_forum.short_name = \"%s\" %s \
+			GROUP BY subdapp_user.id \
+			%s %s " % (forum_name, since_string, sort_order, limit_string)
+
 		cursor.execute(query)
 		#forum_name, since_string,
 		#logger.error("users_list_id")
-		users_list_info = cursor.fetchall()
-
-		if len(users_list_info) > 0:
-			query_er = "SELECT su.email FROM subdapp_user_follow suf INNER JOIN subdapp_user su ON suf.from_user_id = su.id  WHERE suf.to_user_id = %s"	
-			query_ing = "SELECT su.email FROM subdapp_user_follow suf INNER JOIN subdapp_user su ON suf.to_user_id = su.id  WHERE suf.from_user_id = %s"
-			query_sub = "SELECT thread_id FROM subdapp_thread_subscribe  WHERE user_id = %s"
-			for user_follow in users_list_info:
-				params = user_follow[0]
-				cursor.execute(query_er, params)
-				result_followers = cursor.fetchall()
-				followers_list.append(result_followers)
-
-				cursor.execute(query_ing, params)
-				result_following = cursor.fetchall()
-				following_list.append(result_following)
-
-				cursor.execute(query_sub, params)	
-				result_subscribe = cursor.fetchall()
-				subscribes_list.append(result_subscribe)
-
+		users_list_id = cursor.fetchall()
 		cursor.close()
-
 		#logger.error("users_list_id")
-		#logger.error(followers_list)
-		#logger.error(following_list)
-		logger.error(subscribes_list)
-
-		
-		#user_id_list = []
-		index = 0;
-		if len(users_list_info) > 0:
-			for user_info in users_list_info:
-				info={}
-				follower_res = []
-				following_res = []
-				subscribes_res = []
-				info['id'] = user_info[0]
-
-				if user_info[3] == False:
-					info['about'] = user_info[5]
-					info['username'] = user_info[2]
-					info['name'] = user_info[1]
-				else:
-					info['about'] = None
-					info['username'] = None
-					info['name'] = None
-
-
-				for follower in followers_list[index]:
-					follower_res.append(follower)
-				info['followers'] = follower_res
-
-				for following in following_list[index]:
-					following_res.append(following)
-				info['following'] = following_res
-
-
-				#if len(subscribes_list[index]) > 0:
-				for subscribe in subscribes_list[index]:
-					logger.error(subscribe)
-					subscribes_res.append(subscribe[0])
-				# else:
-				# 	subscribes_res.append(())
-				info['subscriptions'] = subscribes_res
-
-				info['isAnonymous'] = user_info[3]
-				info['email'] = user_info[4]
-		 		out_list.append(info)
-		 		index =index + 1
+		#logger.error(users_list_id)
+		user_id_list = []
+		if len(users_list_id) > 0:
+			for user_id in users_list_id:
+				user_id_list.append(user_id[0])
 
 		#for row in cursor.fetchall():
 		#	user_list.append(row[0])
 
 
-		# for out_user_id in user_id_list:
-		#  	out_user = User.objects.get(id = out_user_id)
-		#  	out_list.append(get_user_info(out_user))
+		for out_user_id in user_id_list:
+		 	out_user = User.objects.get(id = out_user_id)
+		 	out_list.append(get_user_info(out_user))
 
 		json_response = out_list
 

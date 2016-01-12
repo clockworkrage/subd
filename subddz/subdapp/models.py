@@ -20,6 +20,28 @@ class Forum(models.Model):
 	def __unicode__(self):
 		return self.short_name
 
+class User_Post_Forum(models.Model):
+	short_name = models.CharField(max_length = 50, default='shortforumname')
+	user = models.ForeignKey(User)
+	def __unicode__(self):
+		return self.short_name
+
+class User_Post_Thread(models.Model):
+	post_id = models.IntegerField(default=0)
+	email = models.CharField(max_length = 50, null=True)
+	short_name = models.CharField(max_length = 50, default='shortforumname')
+	thread_id = models.IntegerField(default=0)
+	def __unicode__(self):
+		return self.short_name
+
+class User_Thread(models.Model):
+	email = models.CharField(max_length = 50, null=True)
+	short_name = models.CharField(max_length = 50, default='shortforumname')
+	thread_id = models.IntegerField(default=0)
+	count = models.IntegerField(default=0)
+	def __unicode__(self):
+		return self.email
+
 class Thread(models.Model):
 	date 		= models.DateTimeField(auto_now=False, auto_now_add=False)
 	user 		= models.ForeignKey(User, related_name='%(class)s_user_create')
@@ -43,7 +65,7 @@ class Post(models.Model):
 	user 			= models.ForeignKey(User)
 	thread 			= models.ForeignKey(Thread)
 	forum 			= models.ForeignKey(Forum)
-	parent 			= models.IntegerField(default=None)
+	parent 			= models.IntegerField(default=None, null=True)
 	isApproved 		= models.BooleanField(default=False)
 	isHighlighted 	= models.BooleanField(default=False)
 	isEdited 		= models.BooleanField(default=False)

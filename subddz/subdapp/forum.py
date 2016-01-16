@@ -14,8 +14,16 @@ from post import get_post_info
 from thread import get_thread_info
 from utils import check_dict
 
-logger = logging.getLogger(__name__)
+
 #Requesting http://some.host.ru/db/api/forum/create/ with {"name": "Forum With Sufficiently Large Name", "short_name": "forumwithsufficientlylargename", "user": "richard.nixon@example.com"}:
+logger = logging.getLogger(__name__)
+
+def find_list(search_list, value):
+
+	for element in search_list:
+		if element == value:
+			return True
+	return False
 
 def get_forum_info(forum_details):
 
@@ -143,33 +151,173 @@ def forum_listThreads(request):
 	main_response = {'code':0}
 	
 	if request.method == 'GET':
-		since = request.GET.get('since')
+		since_date = request.GET.get('since')
 		order = request.GET['order']
-		forum_name = request.GET['forum']
+		forum_name = request.GET.get('forum', '')
 		related = request.GET.getlist('related')
+		limit = int(request.GET.get('limit', 0))
+
+		user_related = False
+		forum_related = False
+
+		if find_list(related, 'user'):
+			user_related = True
+		if find_list(related, 'forum'):
+			forum_related = True
+
+		# if order == 'desc':
+		# 	sort_order = '-date'
+		# else:
+		# 	sort_order = 'date'
+
+		# thread_list = []
+
+		# forum = Forum.objects.get(short_name = forum_name)
+		# if since != None:
+		# 	thread_list = list(Thread.objects.values_list('id', flat=True).filter(forum=forum, date__gt=since).order_by(sort_order))
+		# else:
+		# 	thread_list = list(Thread.objects.values_list('id', flat=True).filter(forum=forum).order_by(sort_order))
+
+		#out_list = []
+		limit_string = ""
+
+		if limit > 0:
+			limit_string = "LIMIT %d" % limit
+
+		sort_order = " ORDER BY st.date ASC"
 
 		if order == 'desc':
-			sort_order = '-date'
-		else:
-			sort_order = 'date'
+			sort_order = " ORDER BY st.date DESC"
 
-		thread_list = []
+		since =""
 
-		forum = Forum.objects.get(short_name = forum_name)
-		if since != None:
-			thread_list = list(Thread.objects.values_list('id', flat=True).filter(forum=forum, date__gt=since).order_by(sort_order))
-		else:
-			thread_list = list(Thread.objects.values_list('id', flat=True).filter(forum=forum).order_by(sort_order))
+		if since_date != None:
+			since = " AND st.date > \'%s\'" % since_date
 
 		out_list = []
+		user_out = []
+
+		user_forum_info_list = []
+		followers_list = []
+		following_list = []
+		subscribes_list = []
+
+		query = "SELECT id, date, title, slug, message, isClosed, isDeleted, points, dislikes, likes, count, short_name, email, user_id  FROM subdapp_thread st  WHERE st.short_name = \"%s\" \
+			%s %s %s" % (forum_name, since, sort_order, limit_string)
+
+		
+		cursor = connection.cursor()
+		cursor.execute(query)
+		result_threads = cursor.fetchall()
+		
+		if user_related == True:
+			if len(result_threads) > 0:
+				query_er = "SELECT suf.to_email FROM subdapp_user_follow suf  WHERE suf.to_user_id = %s"	
+				query_ing = "SELECT suf.from_email FROM subdapp_user_follow suf WHERE suf.from_user_id = %s"
+				query_sub = "SELECT thread_id FROM subdapp_thread_subscribe  WHERE user_id = %s"
+				query = "SELECT * FROM subdapp_user WHERE id = \"%s\""
+
+				
+				for user_thread in result_threads:
+					params = (user_thread[13],)
+
+					logger.error(user_thread[13])
+
+					cursor.execute(query, params)
+					res_usr_info = cursor.fetchone()		
+					user_forum_info_list.append(res_usr_info)
+
+					cursor.execute(query_er, params)
+					result_followers = cursor.fetchall()
+					followers_list.append(result_followers)
+
+					cursor.execute(query_ing, params)
+					result_following = cursor.fetchall()
+					following_list.append(result_following)
+
+					cursor.execute(query_sub, params)	
+					result_subscribe = cursor.fetchall()
+					subscribes_list.append(result_subscribe)
+
+		cursor.close()
+		# forum_details = None
+
+		if forum_related == True:
+			forum_details = Forum.objects.get(short_name = forum_name)
+
+		
+		index = 0
+		if len(result_threads) > 0:
+			for thread_res in result_threads:
+				#logger.error(post_res)
+				info={}
+				info['date']		= dateformat.format(thread_res[1], settings.DATETIME_FORMAT)
+				info['dislikes']	= thread_res[8]
+				#info['forum']	= thread_res[11]
+				if forum_related == True:
+					info['forum']	= get_forum_info(forum_details)
+				else:
+					info['forum']	= thread_res[11]
+
+				info['id']			= thread_res[0]
+				info['isClosed']	= thread_res[5]
+				info['isDeleted']	= thread_res[6]
+				info['likes']		= thread_res[9]
+				info['message']		= thread_res[4]
+				info['points']		= thread_res[7]
+				info['posts']		= thread_res[10]
+				info['slug']		= thread_res[3]
+				info['title']		= thread_res[2]
+
+				if user_related == False:
+					info['user']	= thread_res[12]
+				else:
+					main_user_info={}
+					follower_res = []
+					following_res = []
+					subscribes_res = []
+
+					main_user_info['id'] = user_forum_info_list[index][0]
+
+					if user_forum_info_list[index][3] == False:
+						main_user_info['about'] = user_forum_info_list[index][5]
+						main_user_info['username'] = user_forum_info_list[index][2]
+						main_user_info['name'] = user_forum_info_list[index][1]
+					else:
+						main_user_info['about'] = None
+						main_user_info['username'] = None
+						main_user_info['name'] = None
 
 
-		for out_thread_id in thread_list:
-			out_thread = Thread.objects.get(id = out_thread_id)
-			out_list.append(get_thread_info(out_thread, related))
+					for follower in followers_list[index]:
+						follower_res.append(follower)
+					main_user_info['followers'] = follower_res
+
+					for following in following_list[index]:
+						following_res.append(following)
+					main_user_info['following'] = following_res
+
+
+					#if len(subscribes_list[index]) > 0:
+					for subscribe in subscribes_list[index]:
+						#logger.error(subscribe)
+						subscribes_res.append(subscribe[0])
+					# else:
+					# 	subscribes_res.append(())
+					main_user_info['subscriptions'] = subscribes_res
+
+					main_user_info['isAnonymous'] = user_forum_info_list[index][3]
+					main_user_info['email'] = user_forum_info_list[index][4]
+					info['user'] = main_user_info
+
+				out_list.append(info)
+				index += 1
+
+		# for out_thread_id in thread_list:
+		# 	out_thread = Thread.objects.get(id = out_thread_id)
+		# 	out_list.append(get_thread_info(out_thread, related))
 
 		json_response = out_list
-
 
 
 	main_response['response'] = json_response
@@ -193,15 +341,15 @@ def forum_listUsers(request):
 		limit_string = ''
 		since_string = ''
 
-		sort_order = " ORDER BY su.name ASC"
+		sort_order = " ORDER BY supf.name ASC"
 
 		if order == 'desc':
-			sort_order = " ORDER BY su.name DESC"
+			sort_order = " ORDER BY supf.name DESC"
 		
 		if limit > 0:
 			limit_string = "LIMIT %d" % limit
 		if since > 0:
-			since_string = "AND su.id >= %d" % since
+			since_string = "AND supf.id >= %d" % since
 		user_list = []
 
 		# forum = Forum.objects.get(short_name = forum_name)
@@ -228,11 +376,11 @@ def forum_listUsers(request):
 		users_list_info = cursor.fetchall()
 
 		if len(users_list_info) > 0:
-			query_er = "SELECT su.email FROM subdapp_user_follow suf INNER JOIN subdapp_user su ON suf.from_user_id = su.id  WHERE suf.to_user_id = %s"	
-			query_ing = "SELECT su.email FROM subdapp_user_follow suf INNER JOIN subdapp_user su ON suf.to_user_id = su.id  WHERE suf.from_user_id = %s"
+			query_er = "SELECT suf.to_email FROM subdapp_user_follow suf  WHERE suf.to_user_id = %s"	
+			query_ing = "SELECT suf.from_email FROM subdapp_user_follow suf WHERE suf.from_user_id = %s"
 			query_sub = "SELECT thread_id FROM subdapp_thread_subscribe  WHERE user_id = %s"
 			for user_follow in users_list_info:
-				params = user_follow[0]
+				params = (user_follow[0],)
 				cursor.execute(query_er, params)
 				result_followers = cursor.fetchall()
 				followers_list.append(result_followers)
@@ -250,11 +398,11 @@ def forum_listUsers(request):
 		#logger.error("users_list_id")
 		#logger.error(followers_list)
 		#logger.error(following_list)
-		logger.error(subscribes_list)
+		#logger.error(subscribes_list)
 
 		
 		#user_id_list = []
-		index = 0;
+		index = 0
 		if len(users_list_info) > 0:
 			for user_info in users_list_info:
 				info={}
@@ -284,7 +432,7 @@ def forum_listUsers(request):
 
 				#if len(subscribes_list[index]) > 0:
 				for subscribe in subscribes_list[index]:
-					logger.error(subscribe)
+					#logger.error(subscribe)
 					subscribes_res.append(subscribe[0])
 				# else:
 				# 	subscribes_res.append(())

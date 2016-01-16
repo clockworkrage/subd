@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from django.shortcuts import render
 from django.http import JsonResponse
-from subdapp.models import User, Forum, Thread, Post, User_Post_Forum, User_Post_Thread, User_Thread
+from subdapp.models import User, Forum, Thread, Post, User_Post_Forum
 import logging
 import json
 from django.db import connection
@@ -115,21 +115,21 @@ def post_create(request):
 		forum = Forum.objects.get(short_name = forum_name)
 		#logger.error("GET3")
 		post = Post(date = date, user = user, thread = thread, forum = forum, isApproved = isApproved, isHighlighted = isHighlighted, 
-			isEdited = isEdited, isSpam = isSpam, isDeleted = isDeleted, message = message, parent = parent)
+			isEdited = isEdited, isSpam = isSpam, isDeleted = isDeleted, message = message, parent = parent, short_name = forum_name, email = user_email)
 		post.save()
 
 		num_results = User_Post_Forum.objects.filter(user = user, short_name = forum.short_name).count()
 
 		if num_results == 0:
-			userpostforum = User_Post_Forum(user = user, short_name = forum.short_name)
+			userpostforum = User_Post_Forum(user = user, short_name = forum.short_name, name = user.name)
 			userpostforum.save()
 
-		userthread = User_Thread.objects.get(thread_id = thread_id)
-		userthread.count += 1
-		userthread.save(update_fields=['count'])
 
-		userpostthread = User_Post_Thread(post_id = post.id, short_name = forum.short_name, thread_id = thread.id, email = user_email)
-		userpostthread.save()
+
+		thread.count += 1
+		thread.save(update_fields=['count'])
+
+		
 		#logger.error("CREATED")
 		
 		json_response['id'] = post.id
@@ -200,6 +200,10 @@ def post_remove(request):
 
 		post.save(update_fields=['isDeleted'])
 
+		thread = Thread.objects.get(id = post.thread_id)
+		thread.count -= 1
+		thread.save(update_fields=['count'])
+
 		main_response = {'code':0}
 
 		json_response['post']	= post_id
@@ -224,6 +228,10 @@ def post_restore(request):
 		post.isDeleted = False
 
 		post.save(update_fields=['isDeleted'])
+
+		thread = Thread.objects.get(id = post.thread_id)
+		thread.count += 1
+		thread.save(update_fields=['count'])
 
 		main_response = {'code':0}
 
@@ -373,14 +381,22 @@ def post_list(request):
 		query = ""
 		out_list = []
 
+		# if forum_name != '':
+		# 	query = "SELECT sp.*, sf.short_name, su.email FROM subdapp_post sp INNER JOIN subdapp_forum sf ON sp.forum_id = sf.id \
+		# 	INNER JOIN subdapp_user su ON sp.user_id = su.id \
+		# 	WHERE sf.short_name = \"%s\"  \
+		# 	%s %s %s" % (forum_name, since, sort_order, limit_string)
+		# else:
+		# 	query = "SELECT sp.*, sf.short_name, su.email FROM subdapp_post sp INNER JOIN subdapp_forum sf ON sp.forum_id = sf.id \
+		# 	INNER JOIN subdapp_user su ON sp.user_id = su.id \
+		# 	WHERE sp.thread_id = %s \
+		# 	%s %s %s" % (thread_id, since, sort_order, limit_string)
 		if forum_name != '':
-			query = "SELECT sp.*, sf.short_name, su.email FROM subdapp_post sp INNER JOIN subdapp_forum sf ON sp.forum_id = sf.id \
-			INNER JOIN subdapp_user su ON sp.user_id = su.id \
-			WHERE sf.short_name = \"%s\"  \
+			query = "SELECT id, date, parent, isApproved, isHighlighted, isEdited, isSpam, isDeleted, message, points, dislikes, likes, short_name, email, thread_id FROM subdapp_post sp \
+			WHERE sp.short_name = \"%s\"  \
 			%s %s %s" % (forum_name, since, sort_order, limit_string)
 		else:
-			query = "SELECT sp.*, sf.short_name, su.email FROM subdapp_post sp INNER JOIN subdapp_forum sf ON sp.forum_id = sf.id \
-			INNER JOIN subdapp_user su ON sp.user_id = su.id \
+			query = "SELECT id, date, parent, isApproved, isHighlighted, isEdited, isSpam, isDeleted, message, points, dislikes, likes, short_name, email, thread_id  FROM subdapp_post sp \
 			WHERE sp.thread_id = %s \
 			%s %s %s" % (thread_id, since, sort_order, limit_string)
 		#logger.error(query)
@@ -396,20 +412,20 @@ def post_list(request):
 				#logger.error(post_res)
 				info={}
 				info['date']			= dateformat.format(post_res[1], settings.DATETIME_FORMAT)
-				info['dislikes']		= post_res[12]
-				info['forum']			= post_res[15]
+				info['dislikes']		= post_res[10]
+				info['forum']			= post_res[12]
 				info['id']				= post_res[0]
 				info['isApproved']		= post_res[3]
 				info['isDeleted']		= post_res[7]
 				info['isEdited']		= post_res[5]
 				info['isHighlighted']	= post_res[4]
 				info['isSpam']			= post_res[6]
-				info['likes']			= post_res[14]
+				info['likes']			= post_res[11]
 				info['message']			= post_res[8]
 				info['parent']			= post_res[2]
-				info['points']			= post_res[13]
-				info['thread']	= post_res[10]
-				info['user']	= post_res[16]
+				info['points']			= post_res[9]
+				info['thread']	= post_res[14]
+				info['user']	= post_res[13]
 				out_list.append(info)
 
 		json_response	=	out_list

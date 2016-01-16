@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from django.shortcuts import render
 from django.http import JsonResponse
-from subdapp.models import User, Forum, Thread, Post
+from subdapp.models import User, Forum, Thread, Post, User_Post_Forum
 import json
 import logging
 from django.db import connection
@@ -88,9 +88,6 @@ def user_create(request):
 			main_response = {'code':5}
 			json_response = "error message"
 
-
-	
-
 	main_response['response'] = json_response;
 	response = JsonResponse(main_response)
 
@@ -170,26 +167,25 @@ def user_details(request):
 	user_email = request.GET['user']
 
 	#user_detail = User.objects.get(email = user_email)
-	query = "SELECT * FROM subdapp_user WHERE email = %s"
-	params = user_email
+	query = "SELECT * FROM subdapp_user WHERE email = \"%s\"" % (user_email)
+
 	cursor = connection.cursor()
-	cursor.execute(query, params)
+	cursor.execute(query)
 	result_user = cursor.fetchone()
 	
-	params = result_user[0]
-	query = "SELECT su.email FROM subdapp_user_follow suf INNER JOIN subdapp_user su ON suf.from_user_id = su.id  WHERE suf.to_user_id = %s"	
+	query = "SELECT su.email FROM subdapp_user_follow suf INNER JOIN subdapp_user su ON suf.from_user_id = su.id  WHERE suf.to_user_id = %s" % (result_user[0])	
 	
-	cursor.execute(query, params)	
+	cursor.execute(query)	
 	result_followers = cursor.fetchall()
 
 	
 
-	query = "SELECT su.email FROM subdapp_user_follow suf INNER JOIN subdapp_user su ON suf.to_user_id = su.id  WHERE suf.from_user_id = %s"
-	cursor.execute(query, params)	
+	query = "SELECT su.email FROM subdapp_user_follow suf INNER JOIN subdapp_user su ON suf.to_user_id = su.id  WHERE suf.from_user_id = %s" % (result_user[0])	
+	cursor.execute(query)	
 	result_following = cursor.fetchall()
 
-	query = "SELECT thread_id FROM subdapp_thread_subscribe  WHERE user_id = %s"
-	cursor.execute(query, params)	
+	query = "SELECT thread_id FROM subdapp_thread_subscribe  WHERE user_id = %s" % (result_user[0])	
+	cursor.execute(query)	
 	result_subscribe = cursor.fetchall()
 
 	cursor.close()
@@ -249,10 +245,17 @@ def user_follow(request):
 		follower_user = User.objects.get(email = follower_email)
 		followee_user = User.objects.get(email = followee_email)
 
+		query = "INSERT INTO subdapp_user_follow (from_user_id, to_user_id, to_email, from_email) VALUES (%s, %s, \"%s\", \"%s\")" % (follower_user.id, followee_user.id,follower_user.email, followee_user.email)
+
+		cursor = connection.cursor()
+		cursor.execute(query)
+		connection.commit()
+		cursor.close()
+
 		#logger.error(follower_user)
 		#logger.error(followee_user)
 
-		follower_user.follow.add(followee_user)
+		# follower_user.follow.add(followee_user)
 
 		main_response = {'code':0}
 
@@ -310,9 +313,17 @@ def user_updateProfile(request):
 		user_name 	= input_params['name']
 		#logger.error("READED")
 		user = User.objects.get(email = user_email) #.update(about = about, user_name = user_name)
+		
 		user.about = about
 		user.name = user_name
+
+		
 		user.save(update_fields=['about', 'name'])
+
+
+		User_Post_Forum.objects.filter(user = user).update(name=user_name)
+			#userpostforum.name = user_name
+			#userpostforum.save(update_fields=['name'])
 		#logger.error(user)
 		main_response = {'code':0}
 		json_response = get_user_info(user)

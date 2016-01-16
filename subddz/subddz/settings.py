@@ -46,7 +46,6 @@ MIDDLEWARE_CLASSES = (
     'django.middleware.common.CommonMiddleware',
     #'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.auth.middleware.SessionAuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 )
@@ -62,8 +61,8 @@ WSGI_APPLICATION = 'subddz.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql', 
-    'NAME': 'subddz',    
-    'DATABASE': 'subddz',                                 
+    'NAME': 'sub4',    
+    'DATABASE': 'sub4',                                 
         'USER': 'root',
         'PASSWORD': 'uschsh38',
         'HOST': 'localhost',
@@ -71,57 +70,36 @@ DATABASES = {
     }
 }
 
+
 LOGGING = {
     'version': 1,
-    'disable_existing_loggers': True,
-    'formatters': {
-        'standard': {
-            'format' : "[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s",
-            'datefmt' : "%d/%b/%Y %H:%M:%S"
-        },
-    },
+    'disable_existing_loggers': False,
     'handlers': {
-        'null': {
-            'level':'DEBUG',
-            'class':'django.utils.log.NullHandler',
-        },
-        'logfile': {
-            'level':'DEBUG',
-            'class':'logging.handlers.RotatingFileHandler',
+        'file': {
+            'level': 'ERROR',
+            'class': 'logging.FileHandler',
             'filename': BASE_DIR + "/logfile",
-            'maxBytes': 50000,
-            'backupCount': 2,
-            'formatter': 'standard',
-        },
-        'console':{
-            'level':'INFO',
-            'class':'logging.StreamHandler',
-            'formatter': 'standard'
         },
     },
     'loggers': {
+        '': {
+            'handlers': ['file'],
+            'level': 'ERROR',
+            'propagate': True
+        },
         'django': {
-            'handlers':['console'],
+            'handlers': ['file'],
+            'level': 'ERROR',
             'propagate': True,
-            'level':'WARN',
         },
-        'django.db.backends': {
-            'handlers': ['console'],
-            'level': 'DEBUG',
-            'propagate': False,
-        },
-        'subdapp': {
-            'handlers': ['console', 'logfile'],
-            'level': 'DEBUG',
-        },
-    }
+    },
 }
 
 # Internationalization
 # https://docs.djangoproject.com/en/1.7/topics/i18n/
-TEMPLATE_DIRS = {
-    BASE_DIR + "/templates"
-}
+TEMPLATE_DIRS = (
+    BASE_DIR + "/templates",
+)
 
 LANGUAGE_CODE = 'en-us'
 

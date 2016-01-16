@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from django.shortcuts import render
 from django.http import JsonResponse
-from subdapp.models import User, Forum, Thread, Post, User_Post_Forum, User_Thread, User_Post_Thread
+from subdapp.models import User, Forum, Thread, Post, User_Post_Forum 
 import logging
 import json
 from django.db import connection
@@ -58,8 +58,6 @@ def clear(request):
 	Thread.objects.all().delete()
 	Post.objects.all().delete()
 	User_Post_Forum.objects.all().delete()
-	User_Thread.objects.all().delete()
-	User_Post_Thread.objects.all().delete()
 	
 	main_responce = {'code':0}
 	main_responce['response'] = "OK"

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 from django.shortcuts import render
 from django.http import JsonResponse
-from subdapp.models import User, Forum, Thread, Post, User_Thread
+from subdapp.models import User, Forum, Thread, Post
 import json
 from django.db import connection
 from django.db.models.fields.related import ManyToManyField
@@ -15,7 +15,7 @@ def find_list(search_list, value):
 
 	for element in search_list:
 		if element == value:
-			return True;
+			return True
 
 	return False
 
@@ -94,12 +94,9 @@ def thread_create(request):
 		forum = Forum.objects.get(short_name = forum_name)
 
 		thread = Thread (date = thread_date, user =user, forum = forum, title = title, slug = slug, message = message,
-			isClosed = isClosed, isDeleted = isDeleted)
+			isClosed = isClosed, isDeleted = isDeleted, count = 0, short_name = forum_name, email = user_email)
 		thread.save()
 
-		#num_results = User_Post_Forum.objects.filter(user = user, short_name = forum.short_name).count()
-		userthread = User_Thread(short_name = forum.short_name, thread_id = thread.id, email = user_email, count = 0)
-		userthread.save()
 
 		json_response['id'] = thread.id
 		json_response['date'] = thread.date
@@ -135,7 +132,9 @@ def get_thread_info(thread_detail, related):
 	info['likes']		= thread_detail.likes
 	info['message']		= thread_detail.message
 	info['points']		= thread_detail.points
-	info['posts']		= Post.objects.filter(thread = thread_detail, isDeleted = False).count()
+	info['posts']		= thread_detail.count
+	if thread_detail.isDeleted == 1:
+		info['posts'] = 0
 	info['slug']		= thread_detail.slug
 	info['title']		= thread_detail.title
 	if find_list(related, 'user'):
@@ -380,7 +379,7 @@ def thread_remove(request):
 		thread.save(update_fields=['isDeleted'])
 
 		cursor = connection.cursor()
-		cursor.execute("UPDATE subdapp_post SET isDeleted=1 WHERE thread_id=%s",[thread.id])
+		cursor.execute("UPDATE subdapp_post SET isDeleted=1 WHERE thread_id=%s",(thread.id,))
 		connection.commit()
 		cursor.close()
 		
@@ -410,7 +409,7 @@ def thread_restore(request):
 		thread.save(update_fields=['isDeleted'])
 
 		cursor = connection.cursor()
-		cursor.execute("UPDATE subdapp_post SET isDeleted=0 WHERE thread_id=%s",[thread.id])
+		cursor.execute("UPDATE subdapp_post SET isDeleted=0 WHERE thread_id=%s",(thread.id,))
 		connection.commit()
 		cursor.close()
 
@@ -474,10 +473,10 @@ def thread_list(request):
 		query = ""
 
 		if forum_name != '':
-			query = "SELECT st.*, sut.short_name, sut.email, sut.count  FROM subdapp_thread st  INNER JOIN  subdapp_user_thread sut ON st.id = sut.thread_id WHERE sut.short_name = \"%s\" \
+			query = "SELECT id, date, title, slug, message, isClosed, isDeleted, points, dislikes, likes, count, short_name, email  FROM subdapp_thread st  WHERE st.short_name = \"%s\" \
 			%s %s %s" % (forum_name, since, sort_order, limit_string)
 		else:
-			query = "SELECT st.*, sut.short_name, sut.email, sut.count   FROM subdapp_thread st  INNER JOIN  subdapp_user_thread sut ON st.id = sut.thread_id WHERE sut.email = \"%s\"  \
+			query = "SELECT id, date, title, slug, message, isClosed, isDeleted, points, dislikes, likes, count, short_name, email FROM subdapp_thread st WHERE st.email = \"%s\"  \
 			%s %s %s" % (user_email, since, sort_order, limit_string)
 
 		cursor = connection.cursor()
@@ -494,18 +493,18 @@ def thread_list(request):
 				#logger.error(post_res)
 				info={}
 				info['date']		= dateformat.format(thread_res[1], settings.DATETIME_FORMAT)
-				info['dislikes']	= thread_res[9]
-				info['forum']	= thread_res[12]
+				info['dislikes']	= thread_res[8]
+				info['forum']	= thread_res[11]
 				info['id']			= thread_res[0]
 				info['isClosed']	= thread_res[5]
 				info['isDeleted']	= thread_res[6]
-				info['likes']		= thread_res[11]
+				info['likes']		= thread_res[9]
 				info['message']		= thread_res[4]
-				info['points']		= thread_res[10]
-				info['posts']		= thread_res[14]
+				info['points']		= thread_res[7]
+				info['posts']		= thread_res[10]
 				info['slug']		= thread_res[3]
 				info['title']		= thread_res[2]
-				info['user']	= thread_res[13]
+				info['user']	= thread_res[12]
 
 				out_list.append(info)
 
@@ -567,7 +566,7 @@ def thread_listPosts(request):
 
 		out_list = []
 
-		query = "SELECT sp.*, supt.short_name, supt.email   FROM subdapp_post sp  INNER JOIN  subdapp_user_post_thread supt ON sp.id = supt.post_id WHERE sp.thread_id = %s  \
+		query = "SELECT id, date, parent, isApproved, isHighlighted, isEdited, isSpam, isDeleted, message, points, dislikes, likes, short_name, email, thread_id  FROM subdapp_post sp   WHERE sp.thread_id = %s  \
 		%s %s %s" % (thread_id, since, sort_order, limit_string)
 
 		cursor = connection.cursor()
@@ -580,20 +579,20 @@ def thread_listPosts(request):
 				#logger.error(post_res)
 				info={}
 				info['date']			= dateformat.format(post_res[1], settings.DATETIME_FORMAT)
-				info['dislikes']		= post_res[12]
-				info['forum']			= post_res[15]
+				info['dislikes']		= post_res[10]
+				info['forum']			= post_res[12]
 				info['id']				= post_res[0]
 				info['isApproved']		= post_res[3]
 				info['isDeleted']		= post_res[7]
 				info['isEdited']		= post_res[5]
 				info['isHighlighted']	= post_res[4]
 				info['isSpam']			= post_res[6]
-				info['likes']			= post_res[14]
+				info['likes']			= post_res[11]
 				info['message']			= post_res[8]
 				info['parent']			= post_res[2]
-				info['points']			= post_res[13]
-				info['thread']	= post_res[10]
-				info['user']	= post_res[16]
+				info['points']			= post_res[9]
+				info['thread']	= post_res[14]
+				info['user']	= post_res[13]
 				out_list.append(info)
 
 		main_response = {'code':0}

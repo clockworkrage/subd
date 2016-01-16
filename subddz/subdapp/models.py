@@ -23,24 +23,10 @@ class Forum(models.Model):
 class User_Post_Forum(models.Model):
 	short_name = models.CharField(max_length = 50, default='shortforumname')
 	user = models.ForeignKey(User)
+	name = models.CharField(max_length = 50, null=True)
 	def __unicode__(self):
 		return self.short_name
 
-class User_Post_Thread(models.Model):
-	post_id = models.IntegerField(default=0)
-	email = models.CharField(max_length = 50, null=True)
-	short_name = models.CharField(max_length = 50, default='shortforumname')
-	thread_id = models.IntegerField(default=0)
-	def __unicode__(self):
-		return self.short_name
-
-class User_Thread(models.Model):
-	email = models.CharField(max_length = 50, null=True)
-	short_name = models.CharField(max_length = 50, default='shortforumname')
-	thread_id = models.IntegerField(default=0)
-	count = models.IntegerField(default=0)
-	def __unicode__(self):
-		return self.email
 
 class Thread(models.Model):
 	date 		= models.DateTimeField(auto_now=False, auto_now_add=False)
@@ -55,7 +41,9 @@ class Thread(models.Model):
 	points 		= models.IntegerField(default=0)
 	dislikes 	= models.IntegerField(default=0)
 	likes 		= models.IntegerField(default=0)
-	
+	count 		= models.IntegerField(default=0)
+	short_name = models.CharField(max_length = 50, default='shortforumname')
+	email = models.CharField(max_length = 50, null=True)
 
 	def __unicode__(self):
 		return self.title
@@ -75,7 +63,9 @@ class Post(models.Model):
 	points 			= models.IntegerField(default=0)
 	dislikes 		= models.IntegerField(default=0)
 	likes 			= models.IntegerField(default=0)
-	
+	short_name = models.CharField(max_length = 50, default='shortforumname')
+	email = models.CharField(max_length = 50, null=True)
+
 
 	def __unicode__(self):
 		return self.message

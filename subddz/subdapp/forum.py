@@ -9,14 +9,20 @@ from django.db.models.fields.related import ManyToManyField
 from django.core import serializers
 from django.utils import dateformat
 from django.conf import settings
-from user import get_user_info
-from post import get_post_info
-from thread import get_thread_info
-from utils import check_dict
+#from user import get_user_info
+#from post import get_post_info
+#from thread import get_thread_info
+#from utils import check_dict
 
 
 #Requesting http://some.host.ru/db/api/forum/create/ with {"name": "Forum With Sufficiently Large Name", "short_name": "forumwithsufficientlylargename", "user": "richard.nixon@example.com"}:
 logger = logging.getLogger(__name__)
+
+def check_dict(data, keys):
+	for key in keys:
+		if key not in data:
+			raise Exception('required')
+	return
 
 def find_list(search_list, value):
 
@@ -24,6 +30,97 @@ def find_list(search_list, value):
 		if element == value:
 			return True
 	return False
+
+
+
+def get_thread_info(thread_detail, related):
+	info = {}
+
+	info['date']		= dateformat.format(thread_detail.date, settings.DATETIME_FORMAT)
+	info['dislikes']	= thread_detail.dislikes
+	
+	if find_list(related, 'forum'):
+		info['forum']	= get_forum_info(thread_detail.forum)
+	else:
+		info['forum']	= thread_detail.forum.short_name
+
+	info['id']			= thread_detail.id
+	info['isClosed']	= thread_detail.isClosed
+	info['isDeleted']	= thread_detail.isDeleted
+	info['likes']		= thread_detail.likes
+	info['message']		= thread_detail.message
+	info['points']		= thread_detail.points
+	info['posts']		= thread_detail.count
+	if thread_detail.isDeleted == 1:
+		info['posts'] = 0
+	info['slug']		= thread_detail.slug
+	info['title']		= thread_detail.title
+	if find_list(related, 'user'):
+		info['user']	= get_user_info(thread_detail.user)
+	else:
+		info['user']	= thread_detail.user.email
+	
+	return info
+
+def get_post_info(post_details, related):
+
+	info = {}
+
+	info['date']			= dateformat.format(post_details.date, settings.DATETIME_FORMAT)
+	info['dislikes']		= post_details.dislikes
+
+	if find_list(related, 'forum'):
+		info['forum']	= get_forum_info(post_details.forum)
+	else:
+		info['forum']	= post_details.forum.short_name
+	info['id']				= post_details.id
+	info['isApproved']		= post_details.isApproved
+	info['isDeleted']		= post_details.isDeleted
+	info['isEdited']		= post_details.isEdited
+	info['isHighlighted']	= post_details.isHighlighted
+	info['isSpam']			= post_details.isSpam
+	info['likes']			= post_details.likes
+	info['message']			= post_details.message
+	if post_details.parent != 0:
+		info['parent']		= post_details.parent
+	info['points']			= post_details.points
+
+	if find_list(related, 'thread'):
+		info['thread']	= get_thread_info(post_details.thread, [])
+	else:
+		info['thread']	= post_details.thread.id
+
+	if find_list(related, 'user'):
+		info['user']	= get_user_info(post_details.user)
+	else:
+		info['user']	= post_details.user.email
+
+	return info
+
+def get_user_info(user_detail):
+	info = {}
+
+	if user_detail.isAnonymous == False:
+		info['about'] = user_detail.about
+		info['username'] = user_detail.username
+		info['name'] = user_detail.name
+		info['followers'] = list(User.objects.values_list('email', flat=True).filter(follow=user_detail))
+		info['following'] = list(user_detail.follow.values_list('email', flat=True).filter())
+	else:
+		info['about'] = None
+		info['username'] = None
+		info['name'] = None
+		info['followers'] = []
+		info['following'] = []
+
+	info['subscriptions'] = list(Thread.objects.values_list('id', flat=True).filter(subscribe=user_detail))
+
+	info['id'] = user_detail.id
+	info['isAnonymous'] = user_detail.isAnonymous
+	info['email'] = user_detail.email
+	
+	
+	return info
 
 def get_forum_info(forum_details):
 
@@ -41,7 +138,7 @@ def forum_create(request):
 	main_response = {'code':0}
 	
 	if request.method == 'POST':
-		input_params = json.loads(request.body)
+		input_params = json.loads(request.body.decode('utf-8'))
 
 
 		name = input_params['name']
@@ -128,17 +225,16 @@ def forum_listPosts(request):
 
 		# post_list = []
 
-		# forum = Forum.objects.get(short_name = forum_name)
 		# if since !=0:
 		# 	if limit != 0:
-		# 		post_list = list(Post.objects.values_list('id', flat=True).filter(forum=forum, date__gt=since).order_by(sort_order)[:limit])
+		# 		post_list = list(Post.objects.values_list('id', flat=True).filter(short_name=forum_name, date__gt=since).order_by(sort_order))
 		# 	else:
-		# 		post_list = list(Post.objects.values_list('id', flat=True).filter(forum=forum, date__gt=since).order_by(sort_order))
+		# 		post_list = list(Post.objects.values_list('id', flat=True).filter(short_name=forum_name, date__gt=since).order_by(sort_order))
 		# else:
 		# 	if limit != 0:
-		# 		post_list = list(Post.objects.values_list('id', flat=True).filter(forum=forum).order_by(sort_order)[:limit])
+		# 		post_list = list(Post.objects.values_list('id', flat=True).filter(short_name=forum_name).order_by(sort_order))
 		# 	else:
-		# 		post_list = list(Post.objects.values_list('id', flat=True).filter(forum=forum).order_by(sort_order))
+		# 		post_list = list(Post.objects.values_list('id', flat=True).filter(short_name=forum_name).order_by(sort_order))
 		
 		# out_list = []
 		user_forum_info_list = []
@@ -168,7 +264,7 @@ def forum_listPosts(request):
 		following_list = []
 		subscribes_list = []
 
-		query = "SELECT id, date, parent, isApproved, isHighlighted, isEdited, isSpam, isDeleted, message, points, dislikes, likes, short_name, email, thread_id \
+		query = "SELECT id, date, parent, isApproved, isHighlighted, isEdited, isSpam, isDeleted, message, points, dislikes, likes, short_name, email, thread_id, user_id \
 		  FROM subdapp_post sp  WHERE sp.short_name = \"%s\" \
 			%s %s %s" % (forum_name, since, sort_order, limit_string)
 
@@ -185,7 +281,7 @@ def forum_listPosts(request):
 
 				
 				for user_post in result_posts:
-					params = (user_post[13],)
+					params = (user_post[15],)
 
 
 					cursor.execute(query, params)
@@ -204,7 +300,7 @@ def forum_listPosts(request):
 					result_subscribe = cursor.fetchall()
 					subscribes_list.append(result_subscribe)
 
-		if thread_related == True:
+		#if thread_related == True:
 
 		cursor.close()
 
@@ -588,8 +684,8 @@ def forum_listUsers(request):
 
 				info['isAnonymous'] = user_info[3]
 				info['email'] = user_info[4]
-		 		out_list.append(info)
-		 		index =index + 1
+				out_list.append(info)
+				index =index + 1
 
 		#for row in cursor.fetchall():
 		#	user_list.append(row[0])

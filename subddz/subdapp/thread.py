@@ -8,7 +8,7 @@ from django.db.models.fields.related import ManyToManyField
 from django.core import serializers
 from django.utils import dateformat
 from django.conf import settings
-from user import get_user_info
+#from user import get_user_info
 
 
 def find_list(search_list, value):
@@ -18,6 +18,31 @@ def find_list(search_list, value):
 			return True
 
 	return False
+	
+def get_user_info(user_detail):
+	info = {}
+
+	if user_detail.isAnonymous == False:
+		info['about'] = user_detail.about
+		info['username'] = user_detail.username
+		info['name'] = user_detail.name
+		info['followers'] = list(User.objects.values_list('email', flat=True).filter(follow=user_detail))
+		info['following'] = list(user_detail.follow.values_list('email', flat=True).filter())
+	else:
+		info['about'] = None
+		info['username'] = None
+		info['name'] = None
+		info['followers'] = []
+		info['following'] = []
+
+	info['subscriptions'] = list(Thread.objects.values_list('id', flat=True).filter(subscribe=user_detail))
+
+	info['id'] = user_detail.id
+	info['isAnonymous'] = user_detail.isAnonymous
+	info['email'] = user_detail.email
+	
+	
+	return info
 
 def get_forum_info(forum_details):
 
@@ -73,7 +98,7 @@ def thread_create(request):
 	main_response = {'code':0}
 	json_response = {}
 	if request.method == 'POST':
-		input_params = json.loads(request.body)
+		input_params = json.loads(request.body.decode('utf-8'))
 		
 		
 		#logger.error(request.body)
@@ -180,7 +205,7 @@ def thread_subscribe(request):
 	main_response = {'code':0}
 	json_response = {}
 	if request.method == 'POST':
-		input_params = json.loads(request.body)
+		input_params = json.loads(request.body.decode('utf-8'))
 		
 		#logger.error(request.body)
 		
@@ -210,7 +235,7 @@ def thread_unsubscribe(request):
 	main_response = {'code':0}
 	json_response = {}
 	if request.method == 'POST':
-		input_params = json.loads(request.body)
+		input_params = json.loads(request.body.decode('utf-8'))
 		
 		#logger.error(request.body)
 		
@@ -241,7 +266,7 @@ def thread_update(request):
 	main_response = {}
 	json_response = {}
 	if request.method == 'POST':
-		input_params = json.loads(request.body)
+		input_params = json.loads(request.body.decode('utf-8'))
 		
 		#logger.error(request.body)
 		thread_id 	= input_params['thread']
@@ -273,7 +298,7 @@ def thread_vote(request):
 	main_response = {}
 	json_response = {}
 	if request.method == 'POST':
-		input_params = json.loads(request.body)
+		input_params = json.loads(request.body.decode('utf-8'))
 		
 		#logger.error(request.body)
 		thread_id 	= input_params['thread']
@@ -309,7 +334,7 @@ def thread_close(request):
 	main_response = {}
 	json_response = {}
 	if request.method == 'POST':
-		input_params = json.loads(request.body)
+		input_params = json.loads(request.body.decode('utf-8'))
 		
 		#logger.error(request.body)
 		thread_id 	= input_params['thread']
@@ -339,7 +364,7 @@ def thread_open(request):
 	main_response = {}
 	json_response = {}
 	if request.method == 'POST':
-		input_params = json.loads(request.body)
+		input_params = json.loads(request.body.decode('utf-8'))
 		
 		#logger.error(request.body)
 		thread_id 	= input_params['thread']
@@ -368,7 +393,7 @@ def thread_remove(request):
 	main_response = {}
 	json_response = {}
 	if request.method == 'POST':
-		input_params = json.loads(request.body)
+		input_params = json.loads(request.body.decode('utf-8'))
 
 		thread_id 	= input_params['thread']
 
@@ -397,7 +422,7 @@ def thread_restore(request):
 	main_response = {}
 	json_response = {}
 	if request.method == 'POST':
-		input_params = json.loads(request.body)
+		input_params = json.loads(request.body.decode('utf-8'))
 		
 
 		thread_id 	= input_params['thread']

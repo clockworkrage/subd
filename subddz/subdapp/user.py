@@ -9,9 +9,15 @@ from django.db.models.fields.related import ManyToManyField
 from django.core import serializers
 from django.utils import dateformat
 from django.conf import settings
-from utils import check_dict
+#from utils import check_dict
 
 logger = logging.getLogger(__name__)
+
+def check_dict(data, keys):
+	for key in keys:
+		if key not in data:
+			raise Exception('required')
+	return
 
 def to_dict(instance):
 	opts = instance._meta
@@ -40,7 +46,7 @@ def user_create(request):
 	
 	if request.method == 'POST':
 
-		input_params = json.loads(request.body)
+		input_params = json.loads(request.body.decode('utf-8'))
 
 		required = ['username', 'about', 'name', 'email']
 
@@ -235,7 +241,7 @@ def user_follow(request):
 	if request.method == 'POST':
 	#for key in request.GET:
 		#logger.error(r"ssss")
-		input_params = json.loads(request.body)
+		input_params = json.loads(request.body.decode('utf-8'))
 
 		follower_email = input_params['follower']
 		followee_email = input_params['followee']
@@ -245,7 +251,7 @@ def user_follow(request):
 		follower_user = User.objects.get(email = follower_email)
 		followee_user = User.objects.get(email = followee_email)
 
-		query = "INSERT INTO subdapp_user_follow (from_user_id, to_user_id, to_email, from_email) VALUES (%s, %s, \"%s\", \"%s\")" % (follower_user.id, followee_user.id,follower_user.email, followee_user.email)
+		query = "INSERT IGNORE INTO subdapp_user_follow (from_user_id, to_user_id, to_email, from_email) VALUES (%s, %s, \"%s\", \"%s\")" % (follower_user.id, followee_user.id,follower_user.email, followee_user.email)
 
 		cursor = connection.cursor()
 		cursor.execute(query)
@@ -276,7 +282,7 @@ def user_unfollow(request):
 	if request.method == 'POST':
 	#for key in request.GET:
 		#logger.error(r"ssss")
-		input_params = json.loads(request.body)
+		input_params = json.loads(request.body.decode('utf-8'))
 
 		follower_email = input_params['follower']
 		followee_email = input_params['followee']
@@ -286,8 +292,14 @@ def user_unfollow(request):
 		follower_user = User.objects.get(email = follower_email)
 		followee_user = User.objects.get(email = followee_email)
 
+		query = "DELETE FROM subdapp_user_follow WHERE from_user_id = %s AND to_user_id = %s" % (follower_user.id, followee_user.id)
 
-		follower_user.follow.remove(followee_user)
+		cursor = connection.cursor()
+		cursor.execute(query)
+		connection.commit()
+		cursor.close()
+
+		#follower_user.follow.remove(followee_user)
 
 		main_response = {'code':0}
 
@@ -306,7 +318,7 @@ def user_updateProfile(request):
 	json_response = {}
 
 	if request.method == 'POST':
-		input_params = json.loads(request.body)
+		input_params = json.loads(request.body.decode('utf-8'))
 
 		about 		= input_params['about']
 		user_email 	= input_params['user']
@@ -356,7 +368,7 @@ def user_listFollowers(request):
 		followers_list = []
 
 		if (limit != 0) and (offset != 0):
-			followers_list = list(User.objects.values_list('email', flat=True).filter(follow=user).order_by(sort_order)[offset:limit + offset])
+			followers_list = list(User.objects.values_list('email', flat=True).filter(follow=user).order_by(sort_order))
 		else:
 			followers_list = list(User.objects.values_list('email', flat=True).filter(follow=user).order_by(sort_order))
 		
@@ -396,7 +408,7 @@ def user_listFollowing(request):
 		following_list = []
 
 		if (limit != 0) and (offset != 0):
-			following_list = list(user.follow.values_list('email', flat=True).filter(id__gt=offset).order_by(sort_order)[:limit])
+			following_list = list(user.follow.values_list('email', flat=True).filter(id__gt=offset).order_by(sort_order))
 		else:
 			following_list = list(user.follow.values_list('email', flat=True).filter().order_by(sort_order))
 		
@@ -423,7 +435,7 @@ def user_listPosts(request):
 
 		user_email = request.GET['user']
 		order = request.GET['order']
-		limit = request.GET.get('limit', 0)
+		limit = int(request.GET.get('limit',0))
 		since = request.GET.get('since')
 
 		#logger.error("reeaded")
@@ -437,11 +449,11 @@ def user_listPosts(request):
 		post_list = []
 
 		
-		if (limit != 0):
+		if (limit != None):
 			if since != None:
-				post_list = list(Post.objects.values_list('id', flat=True).filter(user=user, date__gt=since).order_by(sort_order)[:limit])
+				post_list = list(Post.objects.values_list('id', flat=True).filter(user=user, date__gt=since).order_by(sort_order))
 			else:
-				post_list = list(Post.objects.values_list('id', flat=True).filter(user=user).order_by(sort_order)[:limit])
+				post_list = list(Post.objects.values_list('id', flat=True).filter(user=user).order_by(sort_order))
 		else:
 			if since != None:
 				post_list = list(Post.objects.values_list('id', flat=True).filter(user=user, date__gt=since).order_by(sort_order))

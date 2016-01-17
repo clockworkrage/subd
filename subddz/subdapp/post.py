@@ -9,8 +9,8 @@ from django.db.models.fields.related import ManyToManyField
 from django.core import serializers
 from django.utils import dateformat
 from django.conf import settings
-from user import get_user_info
-from thread import get_thread_info
+#from user import get_user_info
+#from thread import get_thread_info
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +45,60 @@ def find_list(search_list, value):
 			return True;
 
 	return False
+
+def get_user_info(user_detail):
+	info = {}
+
+	if user_detail.isAnonymous == False:
+		info['about'] = user_detail.about
+		info['username'] = user_detail.username
+		info['name'] = user_detail.name
+		info['followers'] = list(User.objects.values_list('email', flat=True).filter(follow=user_detail))
+		info['following'] = list(user_detail.follow.values_list('email', flat=True).filter())
+	else:
+		info['about'] = None
+		info['username'] = None
+		info['name'] = None
+		info['followers'] = []
+		info['following'] = []
+
+	info['subscriptions'] = list(Thread.objects.values_list('id', flat=True).filter(subscribe=user_detail))
+
+	info['id'] = user_detail.id
+	info['isAnonymous'] = user_detail.isAnonymous
+	info['email'] = user_detail.email
+	
+	
+	return info
+
+def get_thread_info(thread_detail, related):
+	info = {}
+
+	info['date']		= dateformat.format(thread_detail.date, settings.DATETIME_FORMAT)
+	info['dislikes']	= thread_detail.dislikes
+	
+	if find_list(related, 'forum'):
+		info['forum']	= get_forum_info(thread_detail.forum)
+	else:
+		info['forum']	= thread_detail.forum.short_name
+
+	info['id']			= thread_detail.id
+	info['isClosed']	= thread_detail.isClosed
+	info['isDeleted']	= thread_detail.isDeleted
+	info['likes']		= thread_detail.likes
+	info['message']		= thread_detail.message
+	info['points']		= thread_detail.points
+	info['posts']		= thread_detail.count
+	if thread_detail.isDeleted == 1:
+		info['posts'] = 0
+	info['slug']		= thread_detail.slug
+	info['title']		= thread_detail.title
+	if find_list(related, 'user'):
+		info['user']	= get_user_info(thread_detail.user)
+	else:
+		info['user']	= thread_detail.user.email
+	
+	return info
 
 def get_post_info(post_details, related):
 
@@ -90,7 +144,7 @@ def post_create(request):
 	main_response = {'code':0}
 	json_response = {}
 	if request.method == 'POST':
-		input_params = json.loads(request.body)
+		input_params = json.loads(request.body.decode('utf-8'))
 		#logger.error("user_email")
 		#logger.error(input_params)
 
@@ -167,7 +221,7 @@ def post_details(request):
 			post = Post.objects.get(id = post_id)
 			json_response	=	get_post_info(post, related)
 		except Exception as e:
-			return JsonResponse({'code':1, 'response': e.message})
+			return JsonResponse({'code':1, 'response': "error"})
 
 		
 
@@ -190,7 +244,7 @@ def post_remove(request):
 	main_response = {}
 	json_response = {}
 	if request.method == 'POST':
-		input_params = json.loads(request.body)
+		input_params = json.loads(request.body.decode('utf-8'))
 
 		post_id = input_params['post']
 
@@ -219,7 +273,7 @@ def post_restore(request):
 	main_response = {}
 	json_response = {}
 	if request.method == 'POST':
-		input_params = json.loads(request.body)
+		input_params = json.loads(request.body.decode('utf-8'))
 
 		post_id 	= input_params['post']
 
@@ -248,7 +302,7 @@ def post_vote(request):
 	main_response = {}
 	json_response = {}
 	if request.method == 'POST':
-		input_params = json.loads(request.body)
+		input_params = json.loads(request.body.decode('utf-8'))
 		
 		#logger.error(request.body)
 		post_id 	= input_params['post']
@@ -284,7 +338,7 @@ def post_update(request):
 	main_response = {}
 	json_response = {}
 	if request.method == 'POST':
-		input_params = json.loads(request.body)
+		input_params = json.loads(request.body.decode('utf-8'))
 		
 		#logger.error(request.body)
 		post_id 	= input_params['post']

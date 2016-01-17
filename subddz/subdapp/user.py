@@ -179,14 +179,14 @@ def user_details(request):
 	cursor.execute(query)
 	result_user = cursor.fetchone()
 	
-	query = "SELECT su.email FROM subdapp_user_follow suf INNER JOIN subdapp_user su ON suf.from_user_id = su.id  WHERE suf.to_user_id = %s" % (result_user[0])	
+	query = "SELECT to_email FROM subdapp_user_follow WHERE to_user_id = %s" % (result_user[0])	
 	
 	cursor.execute(query)	
 	result_followers = cursor.fetchall()
 
 	
 
-	query = "SELECT su.email FROM subdapp_user_follow suf INNER JOIN subdapp_user su ON suf.to_user_id = su.id  WHERE suf.from_user_id = %s" % (result_user[0])	
+	query = "SELECT from_email FROM subdapp_user_follow WHERE from_user_id = %s" % (result_user[0])	
 	cursor.execute(query)	
 	result_following = cursor.fetchall()
 
@@ -352,31 +352,123 @@ def user_listFollowers(request):
 	json_response = {}
 	if request.method == 'GET':
 
-		user_email = request.GET['user']
-		order = request.GET['order']
-		limit = request.GET.get('limit', 0)
-		offset = request.GET.get('since_id', 0)
 
-		#logger.error("reeaded")
-		user = User.objects.get(email = user_email)
+		offset = request.GET.get('since_id')
+		user_email = request.GET['user']
+		order = request.GET.get('order')
+		limit = int(request.GET.get('limit', 0))
+
+		out_list = []
+		post_list = []
+
+		sort_order = " ORDER BY su.name ASC"
 
 		if order == 'desc':
-			sort_order = '-name'
-		else:
-			sort_order = 'name'
+			sort_order = " ORDER BY su.name DESC"
 
-		followers_list = []
+		limit_string = ""
 
-		if (limit != 0) and (offset != 0):
-			followers_list = list(User.objects.values_list('email', flat=True).filter(follow=user).order_by(sort_order))
-		else:
-			followers_list = list(User.objects.values_list('email', flat=True).filter(follow=user).order_by(sort_order))
+		if limit > 0:
+			limit_string = "LIMIT %d" % limit
+
+
+		offset_string = ""
+
+		if offset != None:
+			offset_string = " AND suf.id > %s" % offset
+
+		# #logger.error("reeaded")
+		# user = User.objects.get(email = user_email)
+
+		# if order == 'desc':
+		# 	sort_order = '-name'
+		# else:
+		# 	sort_order = 'name'
+
+		# followers_list = []
+
+		# if (limit != 0) and (offset != 0):
+		# 	followers_list = list(User.objects.values_list('email', flat=True).filter(follow=user).order_by(sort_order))
+		# else:
+		# 	followers_list = list(User.objects.values_list('email', flat=True).filter(follow=user).order_by(sort_order))
 		
-		out_list = []
+		# out_list = []
 
-		for follower in followers_list:
-			follow_user = User.objects.get(email = follower)
-			out_list.append(get_user_info(follow_user))
+		# for follower in followers_list:
+		# 	follow_user = User.objects.get(email = follower)
+		# 	out_list.append(get_user_info(follow_user))
+		out_list = []
+		followers_list = []
+		following_list = []
+		subscribes_list = []
+
+		query = "SELECT su.id, name, username, isAnonymous, email, about  FROM subdapp_user su INNER JOIN subdapp_user_follow suf ON su.id = suf.to_user_id WHERE suf.to_email = \"%s\" \
+		%s %s %s" % (user_email, offset_string, sort_order, limit_string)
+
+		cursor = connection.cursor()
+		cursor.execute(query)
+		users_list_info = cursor.fetchall()
+
+		if len(users_list_info) > 0:
+			query_er = "SELECT suf.to_email FROM subdapp_user_follow suf  WHERE suf.to_user_id = %s"	
+			query_ing = "SELECT suf.from_email FROM subdapp_user_follow suf WHERE suf.from_user_id = %s"
+			query_sub = "SELECT thread_id FROM subdapp_thread_subscribe  WHERE user_id = %s"
+			for user_follow in users_list_info:
+				params = (user_follow[0],)
+				cursor.execute(query_er, params)
+				result_followers = cursor.fetchall()
+				followers_list.append(result_followers)
+
+				cursor.execute(query_ing, params)
+				result_following = cursor.fetchall()
+				following_list.append(result_following)
+
+				cursor.execute(query_sub, params)	
+				result_subscribe = cursor.fetchall()
+				subscribes_list.append(result_subscribe)
+
+		cursor.close()
+
+		index = 0
+		if len(users_list_info) > 0:
+			for user_info in users_list_info:
+				info={}
+				follower_res = []
+				following_res = []
+				subscribes_res = []
+				info['id'] = user_info[0]
+
+				if user_info[3] == False:
+					info['about'] = user_info[5]
+					info['username'] = user_info[2]
+					info['name'] = user_info[1]
+				else:
+					info['about'] = None
+					info['username'] = None
+					info['name'] = None
+
+
+				for follower in followers_list[index]:
+					follower_res.append(follower[0])
+				info['followers'] = follower_res
+
+				for following in following_list[index]:
+					following_res.append(following[0])
+				info['following'] = following_res
+
+
+				#if len(subscribes_list[index]) > 0:
+				for subscribe in subscribes_list[index]:
+					#logger.error(subscribe)
+					subscribes_res.append(subscribe[0])
+				# else:
+				# 	subscribes_res.append(())
+				info['subscriptions'] = subscribes_res
+
+				info['isAnonymous'] = user_info[3]
+				info['email'] = user_info[4]
+				out_list.append(info)
+				index =index + 1
 
 		main_response = {'code':0}
 		json_response = out_list
@@ -388,35 +480,140 @@ def user_listFollowers(request):
 
 def user_listFollowing(request):
 	#logger.error("user_listFollowers")
+	# main_response = {}
+	# json_response = {}
+	# if request.method == 'GET':
+
+	# 	user_email = request.GET['user']
+	# 	order = request.GET['order']
+	# 	limit = request.GET.get('limit', 0)
+	# 	offset = request.GET.get('since_id', 0)
+
+	# 	#logger.error("reeaded")
+	# 	user = User.objects.get(email = user_email)
+
+	# 	if order == 'desc':
+	# 		sort_order = '-name'
+	# 	else:
+	# 		sort_order = 'name'
+
+	# 	following_list = []
+
+	# 	if (limit != 0) and (offset != 0):
+	# 		following_list = list(user.follow.values_list('email', flat=True).filter(id__gt=offset).order_by(sort_order))
+	# 	else:
+	# 		following_list = list(user.follow.values_list('email', flat=True).filter().order_by(sort_order))
+		
+	# 	out_list = []
+
+	# 	for following in following_list:
+	# 		following_user = User.objects.get(email = following)
+	# 		out_list.append(get_user_info(following_user))
+
+	# 	main_response = {'code':0}
+	# 	json_response = out_list
+
 	main_response = {}
 	json_response = {}
 	if request.method == 'GET':
 
-		user_email = request.GET['user']
-		order = request.GET['order']
-		limit = request.GET.get('limit', 0)
-		offset = request.GET.get('since_id', 0)
 
-		#logger.error("reeaded")
-		user = User.objects.get(email = user_email)
+		offset = request.GET.get('since_id')
+		user_email = request.GET['user']
+		order = request.GET.get('order')
+		limit = int(request.GET.get('limit', 0))
+
+		out_list = []
+		post_list = []
+
+		sort_order = " ORDER BY su.name ASC"
 
 		if order == 'desc':
-			sort_order = '-name'
-		else:
-			sort_order = 'name'
+			sort_order = " ORDER BY su.name DESC"
 
-		following_list = []
+		limit_string = ""
 
-		if (limit != 0) and (offset != 0):
-			following_list = list(user.follow.values_list('email', flat=True).filter(id__gt=offset).order_by(sort_order))
-		else:
-			following_list = list(user.follow.values_list('email', flat=True).filter().order_by(sort_order))
-		
+		if limit > 0:
+			limit_string = "LIMIT %d" % limit
+
+
+		offset_string = ""
+
+		if offset != None:
+			offset_string = " AND suf.id > %s" % offset
+
 		out_list = []
+		followers_list = []
+		following_list = []
+		subscribes_list = []
 
-		for following in following_list:
-			following_user = User.objects.get(email = following)
-			out_list.append(get_user_info(following_user))
+		query = "SELECT su.id, name, username, isAnonymous, email, about  FROM subdapp_user su INNER JOIN subdapp_user_follow suf ON su.id = suf.from_user_id WHERE suf.from_email = \"%s\" \
+		%s %s %s" % (user_email, offset_string, sort_order, limit_string)
+
+		cursor = connection.cursor()
+		cursor.execute(query)
+		users_list_info = cursor.fetchall()
+
+		if len(users_list_info) > 0:
+			query_er = "SELECT suf.to_email FROM subdapp_user_follow suf  WHERE suf.to_user_id = %s"	
+			query_ing = "SELECT suf.from_email FROM subdapp_user_follow suf WHERE suf.from_user_id = %s"
+			query_sub = "SELECT thread_id FROM subdapp_thread_subscribe  WHERE user_id = %s"
+			for user_follow in users_list_info:
+				params = (user_follow[0],)
+				cursor.execute(query_er, params)
+				result_followers = cursor.fetchall()
+				followers_list.append(result_followers)
+
+				cursor.execute(query_ing, params)
+				result_following = cursor.fetchall()
+				following_list.append(result_following)
+
+				cursor.execute(query_sub, params)	
+				result_subscribe = cursor.fetchall()
+				subscribes_list.append(result_subscribe)
+
+		cursor.close()
+
+		index = 0
+		if len(users_list_info) > 0:
+			for user_info in users_list_info:
+				info={}
+				follower_res = []
+				following_res = []
+				subscribes_res = []
+				info['id'] = user_info[0]
+
+				if user_info[3] == False:
+					info['about'] = user_info[5]
+					info['username'] = user_info[2]
+					info['name'] = user_info[1]
+				else:
+					info['about'] = None
+					info['username'] = None
+					info['name'] = None
+
+
+				for follower in followers_list[index]:
+					follower_res.append(follower[0])
+				info['followers'] = follower_res
+
+				for following in following_list[index]:
+					following_res.append(following[0])
+				info['following'] = following_res
+
+
+				#if len(subscribes_list[index]) > 0:
+				for subscribe in subscribes_list[index]:
+					#logger.error(subscribe)
+					subscribes_res.append(subscribe[0])
+				# else:
+				# 	subscribes_res.append(())
+				info['subscriptions'] = subscribes_res
+
+				info['isAnonymous'] = user_info[3]
+				info['email'] = user_info[4]
+				out_list.append(info)
+				index =index + 1
 
 		main_response = {'code':0}
 		json_response = out_list
@@ -434,37 +631,85 @@ def user_listPosts(request):
 	if request.method == 'GET':
 
 		user_email = request.GET['user']
-		order = request.GET['order']
-		limit = int(request.GET.get('limit',0))
-		since = request.GET.get('since')
-
+		since_date = request.GET.get('since')
+		order = request.GET.get('order')
+		limit = int(request.GET.get('limit', 0))
+		
 		#logger.error("reeaded")
-		user = User.objects.get(email = user_email)
+		# user = User.objects.get(email = user_email)
 
-		if order == 'desc':
-			sort_order = '-date'
-		else:
-			sort_order = 'date'
+		# if order == 'desc':
+		# 	sort_order = '-date'
+		# else:
+		# 	sort_order = 'date'
 
+		# post_list = []
+
+		
+		# if (limit != None):
+		# 	if since != None:
+		# 		post_list = list(Post.objects.values_list('id', flat=True).filter(user=user, date__gt=since).order_by(sort_order))
+		# 	else:
+		# 		post_list = list(Post.objects.values_list('id', flat=True).filter(user=user).order_by(sort_order))
+		# else:
+		# 	if since != None:
+		# 		post_list = list(Post.objects.values_list('id', flat=True).filter(user=user, date__gt=since).order_by(sort_order))
+		# 	else:
+		# 		post_list = list(Post.objects.values_list('id', flat=True).filter(user=user).order_by(sort_order))
+		
+		# out_list = []
+
+		# for post_id in post_list:
+		# 	post_user = Post.objects.get(id = post_id)
+		# 	out_list.append(get_post_info(post_user, []))
+		out_list = []
 		post_list = []
 
-		
-		if (limit != None):
-			if since != None:
-				post_list = list(Post.objects.values_list('id', flat=True).filter(user=user, date__gt=since).order_by(sort_order))
-			else:
-				post_list = list(Post.objects.values_list('id', flat=True).filter(user=user).order_by(sort_order))
-		else:
-			if since != None:
-				post_list = list(Post.objects.values_list('id', flat=True).filter(user=user, date__gt=since).order_by(sort_order))
-			else:
-				post_list = list(Post.objects.values_list('id', flat=True).filter(user=user).order_by(sort_order))
-		
-		out_list = []
+		sort_order = " ORDER BY sp.date ASC"
 
-		for post_id in post_list:
-			post_user = Post.objects.get(id = post_id)
-			out_list.append(get_post_info(post_user, []))
+		if order == 'desc':
+			sort_order = " ORDER BY sp.date DESC"
+
+		limit_string = ""
+
+		if limit > 0:
+			limit_string = "LIMIT %d" % limit
+
+		since =""
+
+		if since_date != None:
+			since = " AND sp.date > \'%s\'" % since_date
+
+		query = "SELECT id, date, parent, isApproved, isHighlighted, isEdited, isSpam, isDeleted, message, points, dislikes, likes, short_name, email, thread_id FROM subdapp_post sp \
+			WHERE sp.email = \"%s\"  \
+			%s %s %s" % (user_email, since, sort_order, limit_string)
+
+		cursor = connection.cursor()
+		cursor.execute(query)
+		result_posts = cursor.fetchall()
+		
+		cursor.close()
+
+		if len(result_posts) > 0:
+			for post_res in result_posts:
+				#logger.error(post_res)
+				info={}
+				info['date']			= dateformat.format(post_res[1], settings.DATETIME_FORMAT)
+				info['dislikes']		= post_res[10]
+				info['forum']			= post_res[12]
+				info['id']				= post_res[0]
+				info['isApproved']		= post_res[3]
+				info['isDeleted']		= post_res[7]
+				info['isEdited']		= post_res[5]
+				info['isHighlighted']	= post_res[4]
+				info['isSpam']			= post_res[6]
+				info['likes']			= post_res[11]
+				info['message']			= post_res[8]
+				info['parent']			= post_res[2]
+				info['points']			= post_res[9]
+				info['thread']	= post_res[14]
+				info['user']	= post_res[13]
+				out_list.append(info)
 
 		main_response = {'code':0}
 		json_response = out_list

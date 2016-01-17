@@ -263,6 +263,7 @@ def forum_listPosts(request):
 		followers_list = []
 		following_list = []
 		subscribes_list = []
+		thread_list = []
 
 		query = "SELECT id, date, parent, isApproved, isHighlighted, isEdited, isSpam, isDeleted, message, points, dislikes, likes, short_name, email, thread_id, user_id \
 		  FROM subdapp_post sp  WHERE sp.short_name = \"%s\" \
@@ -300,7 +301,16 @@ def forum_listPosts(request):
 					result_subscribe = cursor.fetchall()
 					subscribes_list.append(result_subscribe)
 
-		#if thread_related == True:
+		if thread_related == True:
+			if len(result_posts) > 0:
+				query = "SELECT id, date, title, slug, message, isClosed, isDeleted, points, dislikes, likes, count, short_name, email  FROM subdapp_thread st  WHERE st.id = %s "
+
+				for thread_post in result_posts:
+					params = (thread_post[14],)
+
+					cursor.execute(query, params)
+					res_thr_info = cursor.fetchone()		
+					thread_list.append(res_thr_info)
 
 		cursor.close()
 
@@ -329,8 +339,27 @@ def forum_listPosts(request):
 				info['message']			= post_res[8]
 				info['parent']			= post_res[2]
 				info['points']			= post_res[9]
-				info['thread']	= post_res[14]
-				
+
+				if thread_related == False:
+					info['thread']	= post_res[14]
+				else:
+					post_thread_info = {}
+					post_thread_info['date']		= dateformat.format(thread_list[index][1], settings.DATETIME_FORMAT)
+					post_thread_info['dislikes']	= thread_list[index][8]
+					post_thread_info['forum']	= thread_list[index][11]
+					post_thread_info['id']			= thread_list[index][0]
+					post_thread_info['isClosed']	= thread_list[index][5]
+					post_thread_info['isDeleted']	= thread_list[index][6]
+					post_thread_info['likes']		= thread_list[index][9]
+					post_thread_info['message']		= thread_list[index][4]
+					post_thread_info['points']		= thread_list[index][7]
+					post_thread_info['posts']		= thread_list[index][10]
+					post_thread_info['slug']		= thread_list[index][3]
+					post_thread_info['title']		= thread_list[index][2]
+					post_thread_info['user']		= thread_list[index][12]
+
+					info['thread'] = post_thread_info
+
 				if user_related == False:
 					info['user']	= post_res[13]
 				else:

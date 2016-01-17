@@ -158,7 +158,7 @@ def get_thread_info(thread_detail, related):
 	info['message']		= thread_detail.message
 	info['points']		= thread_detail.points
 	info['posts']		= thread_detail.count
-	if thread_detail.isDeleted == 1:
+	if thread_detail.isDeleted == True:
 		info['posts'] = 0
 	info['slug']		= thread_detail.slug
 	info['title']		= thread_detail.title

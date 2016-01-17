@@ -104,37 +104,185 @@ def forum_listPosts(request):
 	main_response = {'code':0}
 	
 	if request.method == 'GET':
-		since = request.GET.get('since', 0)
+		since_date = request.GET.get('since')
 		order = request.GET['order']
 		forum_name = request.GET['forum']
-		limit = request.GET.get('limit', 0)
+		limit = int(request.GET.get('limit', 0))
 		related = request.GET.getlist('related')
 
-		if order == 'desc':
-			sort_order = '-date'
-		else:
-			sort_order = 'date'
+		user_related = False
+		forum_related = False
+		thread_related = False
 
-		post_list = []
+		if find_list(related, 'user'):
+			user_related = True
+		if find_list(related, 'forum'):
+			forum_related = True
+		if find_list(related, 'thread'):
+			thread_related = True
 
-		forum = Forum.objects.get(short_name = forum_name)
-		if since !=0:
-			if limit != 0:
-				post_list = list(Post.objects.values_list('id', flat=True).filter(forum=forum, date__gt=since).order_by(sort_order)[:limit])
-			else:
-				post_list = list(Post.objects.values_list('id', flat=True).filter(forum=forum, date__gt=since).order_by(sort_order))
-		else:
-			if limit != 0:
-				post_list = list(Post.objects.values_list('id', flat=True).filter(forum=forum).order_by(sort_order)[:limit])
-			else:
-				post_list = list(Post.objects.values_list('id', flat=True).filter(forum=forum).order_by(sort_order))
+		# if order == 'desc':
+		# 	sort_order = '-date'
+		# else:
+		# 	sort_order = 'date'
+
+		# post_list = []
+
+		# forum = Forum.objects.get(short_name = forum_name)
+		# if since !=0:
+		# 	if limit != 0:
+		# 		post_list = list(Post.objects.values_list('id', flat=True).filter(forum=forum, date__gt=since).order_by(sort_order)[:limit])
+		# 	else:
+		# 		post_list = list(Post.objects.values_list('id', flat=True).filter(forum=forum, date__gt=since).order_by(sort_order))
+		# else:
+		# 	if limit != 0:
+		# 		post_list = list(Post.objects.values_list('id', flat=True).filter(forum=forum).order_by(sort_order)[:limit])
+		# 	else:
+		# 		post_list = list(Post.objects.values_list('id', flat=True).filter(forum=forum).order_by(sort_order))
 		
+		# out_list = []
+		user_forum_info_list = []
+		followers_list = []
+		following_list = []
+		subscribes_list = []
+
+		limit_string = ""
+
+		if limit > 0:
+			limit_string = "LIMIT %d" % limit
+
+		sort_order = " ORDER BY sp.date ASC"
+
+		if order == 'desc':
+			sort_order = " ORDER BY sp.date DESC"
+
+		since =""
+
+		if since_date != None:
+			since = " AND sp.date > \'%s\'" % since_date
+
 		out_list = []
 
+		user_forum_info_list = []
+		followers_list = []
+		following_list = []
+		subscribes_list = []
 
-		for out_post_id in post_list:
-			out_post = Post.objects.get(id = out_post_id)
-			out_list.append(get_post_info(out_post, related))
+		query = "SELECT id, date, parent, isApproved, isHighlighted, isEdited, isSpam, isDeleted, message, points, dislikes, likes, short_name, email, thread_id \
+		  FROM subdapp_post sp  WHERE sp.short_name = \"%s\" \
+			%s %s %s" % (forum_name, since, sort_order, limit_string)
+
+		cursor = connection.cursor()
+		cursor.execute(query)
+		result_posts = cursor.fetchall()
+		
+		if user_related == True:
+			if len(result_posts) > 0:
+				query_er = "SELECT suf.to_email FROM subdapp_user_follow suf  WHERE suf.to_user_id = %s"	
+				query_ing = "SELECT suf.from_email FROM subdapp_user_follow suf WHERE suf.from_user_id = %s"
+				query_sub = "SELECT thread_id FROM subdapp_thread_subscribe  WHERE user_id = %s"
+				query = "SELECT * FROM subdapp_user WHERE id = \"%s\""
+
+				
+				for user_post in result_posts:
+					params = (user_post[13],)
+
+
+					cursor.execute(query, params)
+					res_usr_info = cursor.fetchone()		
+					user_forum_info_list.append(res_usr_info)
+
+					cursor.execute(query_er, params)
+					result_followers = cursor.fetchall()
+					followers_list.append(result_followers)
+
+					cursor.execute(query_ing, params)
+					result_following = cursor.fetchall()
+					following_list.append(result_following)
+
+					cursor.execute(query_sub, params)	
+					result_subscribe = cursor.fetchall()
+					subscribes_list.append(result_subscribe)
+
+		if thread_related == True:
+
+		cursor.close()
+
+		if forum_related == True:
+			forum_details = Forum.objects.get(short_name = forum_name)
+
+		
+		index = 0
+		if len(result_posts) > 0:
+			for post_res in result_posts:
+				#logger.error(post_res)
+				info={}
+				info['date']			= dateformat.format(post_res[1], settings.DATETIME_FORMAT)
+				info['dislikes']		= post_res[10]
+				if forum_related == True:
+					info['forum']	= get_forum_info(forum_details)
+				else:
+					info['forum']	= post_res[12]
+				info['id']				= post_res[0]
+				info['isApproved']		= post_res[3]
+				info['isDeleted']		= post_res[7]
+				info['isEdited']		= post_res[5]
+				info['isHighlighted']	= post_res[4]
+				info['isSpam']			= post_res[6]
+				info['likes']			= post_res[11]
+				info['message']			= post_res[8]
+				info['parent']			= post_res[2]
+				info['points']			= post_res[9]
+				info['thread']	= post_res[14]
+				
+				if user_related == False:
+					info['user']	= post_res[13]
+				else:
+					main_user_info={}
+					follower_res = []
+					following_res = []
+					subscribes_res = []
+
+					main_user_info['id'] = user_forum_info_list[index][0]
+
+					if user_forum_info_list[index][3] == False:
+						main_user_info['about'] = user_forum_info_list[index][5]
+						main_user_info['username'] = user_forum_info_list[index][2]
+						main_user_info['name'] = user_forum_info_list[index][1]
+					else:
+						main_user_info['about'] = None
+						main_user_info['username'] = None
+						main_user_info['name'] = None
+
+
+					for follower in followers_list[index]:
+						follower_res.append(follower)
+					main_user_info['followers'] = follower_res
+
+					for following in following_list[index]:
+						following_res.append(following)
+					main_user_info['following'] = following_res
+
+
+					#if len(subscribes_list[index]) > 0:
+					for subscribe in subscribes_list[index]:
+						#logger.error(subscribe)
+						subscribes_res.append(subscribe[0])
+					# else:
+					# 	subscribes_res.append(())
+					main_user_info['subscriptions'] = subscribes_res
+
+					main_user_info['isAnonymous'] = user_forum_info_list[index][3]
+					main_user_info['email'] = user_forum_info_list[index][4]
+					info['user'] = main_user_info
+
+				out_list.append(info)
+				index += 1
+		# for out_post_id in post_list:
+		# 	out_post = Post.objects.get(id = out_post_id)
+		# 	out_list.append(get_post_info(out_post, related))
+
+
 
 		json_response = out_list
 
@@ -195,7 +343,7 @@ def forum_listThreads(request):
 			since = " AND st.date > \'%s\'" % since_date
 
 		out_list = []
-		user_out = []
+
 
 		user_forum_info_list = []
 		followers_list = []

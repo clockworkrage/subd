@@ -61,8 +61,8 @@ WSGI_APPLICATION = 'subddz.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql', 
-    'NAME': 'sub4',    
-    'DATABASE': 'sub4',                                 
+    'NAME': 'sub5',    
+    'DATABASE': 'sub5',                                 
         'USER': 'root',
         'PASSWORD': 'uschsh38',
         'HOST': 'localhost',

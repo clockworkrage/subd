@@ -250,13 +250,17 @@ def post_remove(request):
 
 		post = Post.objects.get(id = post_id)
 
+		if post.isDeleted == False:
+			thread = Thread.objects.get(id = post.thread_id)
+			thread.count -= 1
+			thread.save(update_fields=['count'])
+
 		post.isDeleted = True
 
 		post.save(update_fields=['isDeleted'])
 
-		thread = Thread.objects.get(id = post.thread_id)
-		thread.count -= 1
-		thread.save(update_fields=['count'])
+		
+		
 
 		main_response = {'code':0}
 
@@ -279,13 +283,16 @@ def post_restore(request):
 
 		post = Post.objects.get(id = post_id)
 
+		if post.isDeleted == True:
+			thread = Thread.objects.get(id = post.thread_id)
+			thread.count += 1
+			thread.save(update_fields=['count'])
+
 		post.isDeleted = False
 
 		post.save(update_fields=['isDeleted'])
 
-		thread = Thread.objects.get(id = post.thread_id)
-		thread.count += 1
-		thread.save(update_fields=['count'])
+		
 
 		main_response = {'code':0}
 
@@ -369,9 +376,6 @@ def post_list(request):
 	if request.method == 'GET':
 
 		since_date = request.GET.get('since')
-
-		#since = ' "%s" ' % since_date
-
 		order = request.GET.get('order')
 		limit = int(request.GET.get('limit', 0))
 		forum_name = request.GET.get('forum', '')

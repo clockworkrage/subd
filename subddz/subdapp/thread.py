@@ -158,8 +158,8 @@ def get_thread_info(thread_detail, related):
 	info['message']		= thread_detail.message
 	info['points']		= thread_detail.points
 	info['posts']		= thread_detail.count
-	if thread_detail.isDeleted == True:
-		info['posts'] = 0
+	#if thread_detail.isDeleted == True:
+	#	info['posts'] = 0
 	info['slug']		= thread_detail.slug
 	info['title']		= thread_detail.title
 	if find_list(related, 'user'):
@@ -400,8 +400,8 @@ def thread_remove(request):
 		thread = Thread.objects.get(id = thread_id)
 
 		thread.isDeleted = True
-
-		thread.save(update_fields=['isDeleted'])
+		thread.count = 0
+		thread.save(update_fields=['isDeleted','count'])
 
 		cursor = connection.cursor()
 		cursor.execute("UPDATE subdapp_post SET isDeleted=1 WHERE thread_id=%s",(thread.id,))
@@ -430,8 +430,8 @@ def thread_restore(request):
 		thread = Thread.objects.get(id = thread_id)
 
 		thread.isDeleted = False
-
-		thread.save(update_fields=['isDeleted'])
+		thread.count = Post.objects.filter(thread_id=thread.id).count()
+		thread.save(update_fields=['isDeleted','count'])
 
 		cursor = connection.cursor()
 		cursor.execute("UPDATE subdapp_post SET isDeleted=0 WHERE thread_id=%s",(thread.id,))

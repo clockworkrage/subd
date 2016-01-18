@@ -494,7 +494,7 @@ def forum_listThreads(request):
 				for user_thread in result_threads:
 					params = (user_thread[13],)
 
-					logger.error(user_thread[13])
+					#logger.error(user_thread[13])
 
 					cursor.execute(query, params)
 					res_usr_info = cursor.fetchone()		
